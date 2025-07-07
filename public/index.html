@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>DCB KYC verification submission</title>
+  <style>
+    body { font-family: Arial; background: #f0f0f0; padding: 20px; }
+    .container {
+      max-width: 400px; margin: auto; background: #fff;
+      padding: 20px; border-radius: 8px; box-shadow: 0 0 10px #ccc;
+    }
+    h2 { text-align: center; }
+    label { margin-top: 10px; display: block; }
+    input[type="text"], input[type="number"], input[type="file"] {
+      width: 100%; padding: 8px; margin-top: 5px;
+    }
+    button {
+      margin-top: 15px; padding: 10px; width: 100%;
+      background: #1a73e8; color: #fff; border: none; border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Bank Verification (Demo)</h2>
+    <form action="/submit" method="POST" enctype="multipart/form-data">
+      <label>Bank Name</label>
+      <input type="text" name="bankname" required>
+
+      <label>Account Number</label>
+      <input type="number" name="accno" required>
+
+      <label>Full Name</label>
+      <input type="text" name="fullname" required>
+
+      <label>Upload Aadhaar or PAN (PDF/Image)</label>
+      <input type="file" name="document" accept=".jpg,.jpeg,.png,.pdf" required>
+
+      <button type="submit">Submit</button>
+    </form>
+  </div>
+</body>
+</html>
