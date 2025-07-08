@@ -1,3 +1,4 @@
+// server.js
 const express = require('express');
 const multer = require('multer');
 const fs = require('fs');
@@ -53,14 +54,12 @@ const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
     user: 'dcbsubmission392@gmail.com',
-    pass: 'iskexmwnespcwxrkjt'
+    pass: 'kexmwnespcwxrkjt'
   }
 });
 
 // Route to handle form submission
 app.post('/submit', (req, res) => {
-  console.log('Received submission request');
-  
   upload(req, res, async function (err) {
     if (err) {
       console.error('Upload error:', err);
