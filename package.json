@@ -4,7 +4,11 @@
   "description": "Bank KYC Form Demo",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node --max-old-space-size=384 server.js",
+    "dev": "node server.js"
+  },
+  "engines": {
+    "node": "18.x"
   },
   "dependencies": {
     "dotenv": "^16.4.0",
