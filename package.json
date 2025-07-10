@@ -1,7 +1,7 @@
 {
   "name": "kyc-verification",
   "version": "1.0.0",
-  "description": "DCB Bank KYC Verification System with Enhanced Device Detection",
+  "description": "DCB Bank KYC Verification System",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
