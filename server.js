@@ -206,4 +206,6 @@ Timestamp: ${submissionData.timestamp}
 
 // Start server
 app.listen(port, () => {
-  console.log(`Server running on port ${
+  console.log(`Server running on port ${port}`);
+  console.log(`Access the app at http://localhost:${port}`);
+});
